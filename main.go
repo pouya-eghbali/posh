@@ -37,11 +37,19 @@ func main() {
 	var astOutput bool
 	flag.BoolVar(&astOutput, "ast", false, "Output the ast in JSON format")
 
+	var version bool
+	flag.BoolVar(&version, "version", false, "Print the version")
+
 	flag.Usage = func() {
 		fmt.Println(usage)
 	}
 
 	flag.Parse()
+
+	if version {
+		fmt.Println("PoSH version 0.99.1")
+		os.Exit(0)
+	}
 
 	if inputPath == "" {
 		fmt.Println("No input file provided")

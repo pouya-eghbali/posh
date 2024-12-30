@@ -2,27 +2,27 @@
 
 PoSh is a modern language designed to address the complexities and limitations
 of traditional bash scripting for large automation tasks. By providing better
-error handling, flexibility, and portability, PoSH offers developers a powerful
+error handling, flexibility, and portability, PoSh offers developers a powerful
 tool to write maintainable and robust scripts that can be compiled and shipped
 as a single binary.
 
 > [!NOTE]
-> PoSH is in active development. Features and syntax are subject to change. Stay
+> PoSh is in active development. Features and syntax are subject to change. Stay
 > tuned for updates!
 
-## Why PoSH?
+## Why PoSh?
 
 While bash is great for small, interactive tasks and quick commands, it often
-becomes unwieldy and error-prone as scripts grow in size and complexity. PoSH
+becomes unwieldy and error-prone as scripts grow in size and complexity. PoSh
 aims to fix this by:
 
 - **Reducing Errors:** Strong typing and immutability help catch issues at
   compile-time instead of runtime.
 - **Improving Portability:** Scripts can be compiled into standalone binaries,
   removing dependencies on interpreters or environment setups.
-- **Enhancing Readability:** PoSH syntax is clean, modern, and intuitive, making
+- **Enhancing Readability:** PoSh syntax is clean, modern, and intuitive, making
   scripts easier to understand and maintain.
-- **Maintaining Compatibility:** PoSH integrates seamlessly with existing Unix
+- **Maintaining Compatibility:** PoSh integrates seamlessly with existing Unix
   tools and pipelines.
 
 ## Key Features
@@ -56,9 +56,9 @@ fn main(name string, age int) {
 
 ## Installation
 
-To get started with PoSH:
+To get started with PoSh:
 
-1. **Download the PoSH Compiler:**
+1. **Download the PoSh Compiler:**
 
 ```bash
 go install github.com/pouya-eghbali/posh
@@ -72,11 +72,11 @@ posh --version
 
 ## Getting Started
 
-1. Create a PoSH script:
+1. Create a PoSh script:
 
 ```posh
 fn main() {
-    io.Line("Hello, World!")
+  io.Line("Hello, World!")
 }
 ```
 
@@ -95,7 +95,7 @@ posh -i script.posh -o script
 ## Examples
 
 > [!NOTE]
-> PoSH is currently under active development. The following examples are
+> PoSh is currently under active development. The following examples are
 > conceptual and may not work as expected in the current version.
 
 ### Flag Parsing

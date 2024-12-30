@@ -1,0 +1,917 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"go/ast"
+	"go/printer"
+	"go/token"
+	"log"
+	"path"
+	"strings"
+
+	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer"
+)
+
+var Quote = "\""
+
+func quote(s string) string {
+	return Quote + s + Quote
+}
+
+func importNameFromPath(importPath string) string {
+	// Trim quotes if necessary
+	if len(importPath) > 0 && importPath[0] == '"' && importPath[len(importPath)-1] == '"' {
+		importPath = importPath[1 : len(importPath)-1]
+	}
+	return path.Base(importPath)
+}
+
+type Meta struct {
+	DefinedNames map[string]bool
+	CalledNames  map[string]bool
+	Externals    map[string]bool
+}
+
+type AlienGo struct {
+	// Metadata
+	Meta Meta
+	// Imports
+	Imports []ast.ImportSpec
+	// Import assignments (from "fmt" import Println as fmtPrintln)
+	ImportAssignments []ast.ValueSpec
+	// Constants
+	Constants []ast.GenDecl
+	// Function declarations
+	Functions []ast.FuncDecl
+}
+
+func (a *AlienGo) Init() {
+	a.Meta = Meta{
+		DefinedNames: map[string]bool{},
+		CalledNames:  map[string]bool{},
+		Externals:    map[string]bool{},
+	}
+}
+
+func (a *AlienGo) PerformExternalAnalysis() {
+	// Perform external analysis
+	for name := range a.Meta.CalledNames {
+		if _, ok := a.Meta.DefinedNames[name]; !ok {
+			a.Meta.Externals[name] = true
+		}
+	}
+}
+
+// External functions are exec.ExternalCommand(commandName)
+func MakeExternal(name string) ast.ValueSpec {
+	return ast.ValueSpec{
+		Names: []*ast.Ident{ast.NewIdent(name)},
+		Values: []ast.Expr{
+			&ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent("exec"),
+					Sel: ast.NewIdent("ExternalCommand"),
+				},
+				Args: []ast.Expr{
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: quote(name),
+					},
+				},
+			},
+		},
+	}
+}
+
+type ImportAs struct {
+	ImportPath string `parser:"'import' @String"`
+	ImportName string `parser:"'as' @Ident"`
+}
+
+func (i *ImportAs) toAlienGo(alien *AlienGo) {
+	alien.Imports = append(alien.Imports, ast.ImportSpec{
+		Name: ast.NewIdent(i.ImportName),
+		Path: &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: quote(i.ImportPath),
+		},
+	})
+
+	alien.Meta.DefinedNames[i.ImportName] = true
+}
+
+type ImportFromAs struct {
+	Name string `parser:"@Ident"`
+	As   string `parser:"('as' @Ident)?"`
+}
+
+type ImportFrom struct {
+	ImportPath  string         `parser:"'from' @String"`
+	ImportNames []ImportFromAs `parser:"'import' @@ (',' @@)*"`
+}
+
+func (i *ImportFrom) toAlienGo(alien *AlienGo) {
+	alien.Imports = append(alien.Imports, ast.ImportSpec{
+		Path: &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: quote(i.ImportPath),
+		},
+	})
+
+	for _, importName := range i.ImportNames {
+
+		var name string
+		if importName.As != "" {
+			name = importName.As
+		} else {
+			name = importName.Name
+		}
+
+		alien.Meta.DefinedNames[name] = true
+
+		moduleSelector := &ast.SelectorExpr{
+			X:   ast.NewIdent(importNameFromPath(i.ImportPath)),
+			Sel: ast.NewIdent(importName.Name),
+		}
+
+		alien.ImportAssignments = append(alien.ImportAssignments, ast.ValueSpec{
+			Names: []*ast.Ident{ast.NewIdent(name)},
+			Values: []ast.Expr{
+				moduleSelector,
+			},
+		})
+	}
+}
+
+type Import struct {
+	Import     ImportAs   `parser:"@@"`
+	FromImport ImportFrom `parser:"| @@"`
+}
+
+func (i *Import) toAlienGo(alien *AlienGo) {
+	if i.Import.ImportPath != "" {
+		i.Import.toAlienGo(alien)
+	} else {
+		i.FromImport.toAlienGo(alien)
+	}
+}
+
+type DotNotation struct {
+	Ident    string        `parser:"@Ident"`
+	Accessed []DotNotation `parser:"('.' @@)*"`
+}
+
+func (d *DotNotation) toGoAst() ast.Expr {
+	// Accessed is optional
+	if len(d.Accessed) == 0 {
+		return ast.NewIdent(d.Ident)
+	} else {
+		// Start with the first identifier
+		var expr ast.Expr
+		expr = ast.NewIdent(d.Ident)
+
+		// Chain the accesses
+		for _, access := range d.Accessed {
+			selector := &ast.SelectorExpr{
+				X:   expr,
+				Sel: ast.NewIdent(access.Ident),
+			}
+
+			expr = selector
+		}
+
+		return expr
+	}
+}
+
+type Atomic struct {
+	Number      *Numeric     `parser:"@@"`
+	DotNotation *DotNotation `parser:"| @@"`
+	String      string       `parser:"| @String"`
+}
+
+func (a *Atomic) toGoAst() ast.Expr {
+	if a.Number != nil {
+		return a.Number.toGoAst()
+	} else if a.DotNotation != nil {
+		return a.DotNotation.toGoAst()
+	} else {
+		return &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: quote(a.String),
+		}
+	}
+}
+
+type FlagValue struct {
+	MathExpr *MathExpr `parser:"@@"`
+	Call     *Call     `parser:"| @@"`
+	Atomic   *Atomic   `parser:"| @@"`
+}
+
+// TODO: Fix the flag situation
+type Flag struct {
+	Name  string     `parser:"@'-'@'-'?@Ident"`
+	Value *FlagValue `parser:"@@?"`
+}
+
+func (f *Flag) toGoAst() ast.Expr {
+	// Treat flags as strings
+	isDashed := f.Name[0] == '-'
+	var flag string
+
+	if isDashed {
+		flag = f.Name
+	} else {
+		flag = "--" + f.Name
+	}
+
+	// If there is a value, append it
+	if f.Value != nil {
+		var value ast.Expr
+		if f.Value.MathExpr != nil {
+			value = f.Value.MathExpr.toGoAst()
+		} else if f.Value.Call != nil {
+			value = f.Value.Call.toGoAstExpr()
+		} else {
+			value = f.Value.Atomic.toGoAst()
+		}
+
+		flag += " " + astNodeToString(token.NewFileSet(), value)
+	}
+
+	return &ast.BasicLit{
+		Kind:  token.STRING,
+		Value: quote(flag),
+	}
+}
+
+type CallArg struct {
+	Flag       *Flag       `parser:"@@"`
+	SimpleExpr *SimpleExpr `parser:"| @@"`
+	Marker     string      `parser:"| '@'"`
+}
+
+type Call struct {
+	External bool        `parser:"'$'?"`
+	Callable DotNotation `parser:"@@"`
+	Args     []CallArg   `parser:"'(' (@@ (',' @@)*)? ')'"`
+}
+
+func (c *Call) toGoAstWithArgs(alien *AlienGo, withArgs []ast.Expr) ast.Expr {
+	// Normal calls
+	args := []ast.Expr{}
+
+	for _, arg := range withArgs {
+		args = append(args, arg)
+	}
+
+	for _, arg := range c.Args {
+		if arg.Flag != nil {
+			args = append(args, arg.Flag.toGoAst())
+		} else if arg.SimpleExpr != nil {
+			args = append(args, arg.SimpleExpr.toGoAst())
+		} else if arg.Marker != "" {
+			args = append(args, ast.NewIdent(arg.Marker))
+		} else {
+			log.Fatalf("unexpected call argument: %v", arg)
+		}
+	}
+
+	funName := c.Callable.toGoAst()
+	alien.Meta.CalledNames[astNodeToString(token.NewFileSet(), funName)] = true
+
+	return &ast.CallExpr{
+		Fun:  funName,
+		Args: args,
+	}
+}
+
+func (c *Call) toGoAstExpr() ast.Expr {
+	// Normal calls
+	args := []ast.Expr{}
+	for _, arg := range c.Args {
+		if arg.Flag != nil {
+			args = append(args, arg.Flag.toGoAst())
+		} else if arg.SimpleExpr != nil {
+			args = append(args, arg.SimpleExpr.toGoAst())
+		} else if arg.Marker != "" {
+			args = append(args, ast.NewIdent(arg.Marker))
+		} else {
+			log.Fatalf("unexpected call argument: %v", arg)
+		}
+	}
+
+	return &ast.CallExpr{
+		Fun:  c.Callable.toGoAst(),
+		Args: args,
+	}
+}
+
+func (c *Call) toGoAst() ast.Stmt {
+	return &ast.ExprStmt{
+		X: c.toGoAstExpr(),
+	}
+}
+
+type Numeric struct {
+	Call  *Call    `parser:"@@"`
+	Float *float64 `parser:"| @Float"`
+	Int   *int     `parser:"| @Int"`
+	Ident string   `parser:"| @Ident"`
+}
+
+func (n *Numeric) toGoAst() ast.Expr {
+	if n.Call != nil {
+		return n.Call.toGoAstExpr()
+	} else if n.Float != nil {
+		return &ast.BasicLit{
+			Kind:  token.FLOAT,
+			Value: fmt.Sprintf("%f", *n.Float),
+		}
+	} else if n.Int != nil {
+		return &ast.BasicLit{
+			Kind:  token.INT,
+			Value: fmt.Sprintf("%d", *n.Int),
+		}
+	} else {
+		return ast.NewIdent(n.Ident)
+	}
+}
+
+type TermRhs struct {
+	Term    *Term    `parser:"@@"`
+	Numeric *Numeric `parser:"| @@"`
+}
+
+func (t *TermRhs) toGoAst() ast.Expr {
+	if t.Term != nil {
+		return t.Term.toGoAst()
+	} else {
+		return t.Numeric.toGoAst()
+	}
+}
+
+type Term struct {
+	Left  *Numeric `parser:"@@"`
+	Op    string   `parser:"@('*'|'/')"`
+	Right *TermRhs `parser:"@@"`
+}
+
+func (t *Term) toGoAst() ast.Expr {
+	if t.Op == "" {
+		return t.Left.toGoAst()
+	}
+
+	var op token.Token
+	switch t.Op {
+	case "*":
+		op = token.MUL
+	case "/":
+		op = token.QUO
+	}
+
+	return &ast.BinaryExpr{
+		X:  t.Left.toGoAst(),
+		Op: op,
+		Y:  t.Right.toGoAst(),
+	}
+}
+
+type MathExprLhs struct {
+	Term    *Term    `parser:"@@"`
+	Numeric *Numeric `parser:"| @@"`
+}
+
+func (m *MathExprLhs) toGoAst() ast.Expr {
+	if m.Term != nil {
+		return m.Term.toGoAst()
+	} else {
+		return m.Numeric.toGoAst()
+	}
+}
+
+type MathExprRhs struct {
+	MathExpr    *MathExpr    `parser:"@@"`
+	MathExprLhs *MathExprLhs `parser:"| @@"`
+}
+
+func (m *MathExprRhs) toGoAst() ast.Expr {
+	if m.MathExpr != nil {
+		return m.MathExpr.toGoAst()
+	} else {
+		return m.MathExprLhs.toGoAst()
+	}
+}
+
+type MathExpr struct {
+	Left  *MathExprLhs `parser:"@@"`
+	Op    string       `parser:"@('+'|'-')"`
+	Right *MathExprRhs `parser:"@@"`
+}
+
+func (m *MathExpr) toGoAst() ast.Expr {
+	if m.Op == "" {
+		return m.Left.toGoAst()
+	}
+
+	var op token.Token
+	switch m.Op {
+	case "+":
+		op = token.ADD
+	case "-":
+		op = token.SUB
+	}
+
+	return &ast.BinaryExpr{
+		X:  m.Left.toGoAst(),
+		Op: op,
+		Y:  m.Right.toGoAst(),
+	}
+}
+
+type ChainInput struct {
+	MathExpr *MathExpr `parser:"@@"`
+	Atomic   *Atomic   `parser:"| @@"`
+}
+
+func (c *ChainInput) toGoAst() ast.Expr {
+	if c.MathExpr != nil {
+		return c.MathExpr.toGoAst()
+	} else {
+		return c.Atomic.toGoAst()
+	}
+}
+
+type ChainCall struct {
+	Input ChainInput `parser:"@@"`
+	Calls []Call     `parser:"@Peek('|' @@)+"`
+}
+
+func (c *ChainCall) toStatementGoAst(alien *AlienGo) ast.Stmt {
+	// Start with the input
+	args := []ast.Expr{c.Input.toGoAst()}
+
+	context := &ast.UnaryExpr{
+		Op: token.AND,
+		X:  &ast.CompositeLit{Type: ast.NewIdent("exec.RunContext")},
+	}
+
+	args = []ast.Expr{context, args[0]}
+
+	// Chain the calls
+	var expr ast.Expr
+	for _, call := range c.Calls {
+		expr = call.toGoAstWithArgs(alien, args)
+		args = []ast.Expr{expr}
+	}
+
+	return &ast.ExprStmt{
+		X: expr,
+	}
+}
+
+func (c *ChainCall) toExprGoAst(alien *AlienGo) ast.Expr {
+	// Start with the input
+	args := []ast.Expr{c.Input.toGoAst()}
+
+	context := &ast.UnaryExpr{
+		Op: token.AND,
+		X:  &ast.CompositeLit{Type: ast.NewIdent("exec.RunContext")},
+	}
+
+	args = []ast.Expr{context, args[0]}
+
+	// Chain the calls
+	var expr ast.Expr
+	for _, call := range c.Calls {
+		expr = call.toGoAstWithArgs(alien, args)
+		args = []ast.Expr{expr}
+	}
+
+	// We should .Wait() on the last call
+	waitCall := &ast.CallExpr{
+		Fun: &ast.SelectorExpr{
+			X:   expr,
+			Sel: ast.NewIdent("Wait"),
+		},
+	}
+
+	// We should call ToString() on the result
+	toStringCall := &ast.CallExpr{
+		Fun: &ast.SelectorExpr{
+			X:   waitCall,
+			Sel: ast.NewIdent("ToString"),
+		},
+	}
+
+	return toStringCall
+}
+
+type SimpleExpr struct {
+	MathExpr *MathExpr `parser:"@@"`
+	Call     *Call     `parser:"| @@"`
+	Atomic   *Atomic   `parser:"| @@"`
+	Numeric  *Numeric  `parser:"| @@"`
+}
+
+func (s *SimpleExpr) toGoAst() ast.Expr {
+	if s.Call != nil {
+		return s.Call.toGoAstExpr()
+	} else if s.MathExpr != nil {
+		return s.MathExpr.toGoAst()
+	} else if s.Atomic != nil {
+		return s.Atomic.toGoAst()
+	} else {
+		return s.Numeric.toGoAst()
+	}
+}
+
+type Expr struct {
+	ChainCall  *ChainCall  `parser:"@@"`
+	SimpleExpr *SimpleExpr `parser:"| @@"`
+}
+
+func (e *Expr) toGoAst(alien *AlienGo) ast.Expr {
+	if e.ChainCall != nil {
+		return e.ChainCall.toExprGoAst(alien)
+	} else {
+		return e.SimpleExpr.toGoAst()
+	}
+}
+
+type Returnable struct {
+	Expr     *Expr     `parser:"@@"`
+	Function *Function `parser:"| @@"`
+}
+
+func (r *Returnable) toGoAst(alien *AlienGo) ast.Expr {
+	if r.Expr != nil {
+		return r.Expr.toGoAst(alien)
+	} else {
+		return r.Function.toExprGoAst(alien)
+	}
+}
+
+type Return struct {
+	Value *Returnable `parser:"'return' @@"`
+}
+
+func (r *Return) toGoAst(alien *AlienGo) ast.Stmt {
+	return &ast.ReturnStmt{
+		Results: []ast.Expr{r.Value.toGoAst(alien)},
+	}
+}
+
+type Constant struct {
+	Name string `parser:"'const' @Ident"`
+	Expr *Expr  `parser:"'=' @@"`
+}
+
+func (c *Constant) toGoAst(alien *AlienGo) ast.Stmt {
+	alien.Meta.DefinedNames[c.Name] = true
+
+	ast := &ast.AssignStmt{
+		Lhs: []ast.Expr{ast.NewIdent(c.Name)},
+		Tok: token.DEFINE,
+		Rhs: []ast.Expr{c.Expr.toGoAst(alien)},
+	}
+
+	return ast
+}
+
+type Statement struct {
+	Constant  *Constant  `parser:"@@"`
+	ChainCall *ChainCall `parser:"| @@"`
+	Function  *Function  `parser:"| @@"`
+	Return    *Return    `parser:"| @@"`
+}
+
+func (s *Statement) toGoAst(alien *AlienGo) ast.Stmt {
+	if s.Constant != nil {
+		return s.Constant.toGoAst(alien)
+	} else if s.ChainCall != nil {
+		return s.ChainCall.toStatementGoAst(alien)
+	} else if s.Return != nil {
+		return s.Return.toGoAst(alien)
+	} else {
+		return s.Function.toStatementGoAst(alien)
+	}
+}
+
+type Parameter struct {
+	Name string `parser:"@Ident'?'?"`
+	Type string `parser:"@Ident"`
+}
+
+type Function struct {
+	Export     bool        `parser:"'export'?"`
+	Name       string      `parser:"'fn' @Ident"`
+	Params     []Parameter `parser:"'(' (@@ (',' @@)*)? ')'"`
+	ReturnType string      `parser:"(@Ident)?"`
+	Body       []Statement `parser:"'{' @@* '}'"`
+}
+
+func (f *Function) toGoAst(alien *AlienGo) *ast.FuncDecl {
+	params := []*ast.Field{}
+	for _, param := range f.Params {
+		var name *ast.Ident
+		if param.Name != "" {
+			name = ast.NewIdent(param.Name)
+		}
+
+		params = append(params, &ast.Field{
+			Names: []*ast.Ident{name},
+			Type:  ast.NewIdent(param.Type),
+		})
+	}
+
+	alien.Meta.DefinedNames[f.Name] = true
+	body := []ast.Stmt{}
+	declTypes := ast.FuncType{}
+
+	if f.Name != "main" {
+		declTypes.Params = &ast.FieldList{
+			List: params,
+		}
+
+		declTypes.Results = &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Type: ast.NewIdent(f.ReturnType),
+				},
+			},
+		}
+	} else {
+		// All params should be taken from flags
+		// For example, if we have a function main(name string),
+		// we should take name from flags
+		// var name string
+		// flag.StringVar(&name, "name", "", "")
+		for _, param := range f.Params {
+			// create a var
+			body = append(body, &ast.DeclStmt{
+				Decl: &ast.GenDecl{
+					Tok: token.VAR,
+					Specs: []ast.Spec{
+						&ast.ValueSpec{
+							Names: []*ast.Ident{ast.NewIdent(param.Name)},
+							Type:  ast.NewIdent(param.Type),
+						},
+					},
+				},
+			})
+			// Create a flag
+			flag := &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent("flag"),
+					Sel: ast.NewIdent("StringVar"),
+				},
+				Args: []ast.Expr{
+					&ast.UnaryExpr{
+						Op: token.AND,
+						X:  ast.NewIdent(param.Name),
+					},
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: quote(param.Name),
+					},
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: quote(""),
+					},
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: quote(""),
+					},
+				},
+			}
+
+			body = append(body, &ast.ExprStmt{
+				X: flag,
+			})
+		}
+
+		// Parse flags
+		body = append(body, &ast.ExprStmt{
+			X: &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent("flag"),
+					Sel: ast.NewIdent("Parse"),
+				},
+			},
+		})
+	}
+
+	for _, statement := range f.Body {
+		// print statement to see what's going on
+		body = append(body, statement.toGoAst(alien))
+	}
+
+	return &ast.FuncDecl{
+		Name: ast.NewIdent(f.Name),
+		Type: &declTypes,
+		Body: &ast.BlockStmt{
+			List: body,
+		},
+	}
+}
+
+func (f *Function) toLiteralGoAst(alien *AlienGo) ast.FuncLit {
+	// Use ast.FuncLit
+	params := []*ast.Field{}
+	for _, param := range f.Params {
+		var name *ast.Ident
+		if param.Name != "" {
+			name = ast.NewIdent(param.Name)
+		}
+
+		params = append(params, &ast.Field{
+			Names: []*ast.Ident{name},
+			Type:  ast.NewIdent(param.Type),
+		})
+	}
+
+	body := []ast.Stmt{}
+	for _, statement := range f.Body {
+		body = append(body, statement.toGoAst(alien))
+	}
+
+	return ast.FuncLit{
+		Type: &ast.FuncType{
+			Params: &ast.FieldList{
+				List: params,
+			},
+			Results: &ast.FieldList{
+				List: []*ast.Field{
+					{
+						Type: ast.NewIdent(f.ReturnType),
+					},
+				},
+			},
+		},
+		Body: &ast.BlockStmt{
+			List: body,
+		},
+	}
+}
+
+func (f *Function) toStatementGoAst(alien *AlienGo) ast.Stmt {
+	lit := f.toLiteralGoAst(alien)
+
+	return &ast.ExprStmt{
+		X: &lit,
+	}
+}
+
+func (f *Function) toExprGoAst(alien *AlienGo) ast.Expr {
+	lit := f.toLiteralGoAst(alien)
+
+	return &lit
+}
+
+type TopLevel struct {
+	Import   *Import   `parser:"@@"`
+	Function *Function `parser:"| @@"`
+	Constant *Constant `parser:"| @@"`
+}
+
+type Alien struct {
+	TopLevels []TopLevel `parser:"@@*"`
+}
+
+var AlienLexer = lexer.MustSimple([]lexer.SimpleRule{
+	{Name: `Keyword`, Pattern: `const|fn|export|from|import|as|return`},
+	{Name: `Ident`, Pattern: `[a-zA-Z][a-zA-Z_\d-]*`},
+	{Name: `String`, Pattern: `"(?:\\.|[^"])*"`},
+	{Name: `Float`, Pattern: `[-+]?[0-9]*\.[0-9]+`},
+	{Name: `Int`, Pattern: `[-+]?[0-9]+`},
+	{Name: `Pipe`, Pattern: `\|`},
+	{Name: `Punct`, Pattern: `[-+*/=(){}:;,.@$]`},
+	{Name: `Whitespace`, Pattern: `[ \t\n\r]+`},
+	{Name: `Comment`, Pattern: `#.*\n`},
+})
+
+var AlienParser = participle.MustBuild[Alien](
+	participle.Lexer(AlienLexer),
+	participle.Elide("Whitespace", "Comment"),
+	participle.Unquote("String"),
+)
+
+// Convert an AST node to a string
+func astNodeToString(fset *token.FileSet, node ast.Node) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, node); err != nil {
+		log.Fatalf("failed to print AST node: %v", err)
+	}
+	return buf.String()
+}
+
+var stdImports = []string{
+	"github.com/pouya-eghbali/alien-go/pkg/exec",
+	"github.com/pouya-eghbali/alien-go/pkg/io",
+	"flag",
+}
+
+func main() {
+	code := `
+fn main(name string) {
+	const message = print("hello")
+}
+
+`
+
+	// replace tabs with spaces
+	code = strings.ReplaceAll(code, "\t", "  ")
+	fmt.Println(code)
+
+	alast, err := AlienParser.ParseString("dummy.al", code)
+
+	if err != nil {
+		panic(err)
+	}
+
+	// Print the AST
+
+	alien := AlienGo{}
+	alien.Init()
+
+	for _, highLevel := range alast.TopLevels {
+		if highLevel.Import != nil {
+			highLevel.Import.toAlienGo(&alien)
+		}
+	}
+
+	// import
+	importSpecs := []ast.Spec{}
+	for _, imp := range alien.Imports {
+		importSpecs = append(importSpecs, &imp)
+	}
+
+	// Add standard imports
+	for _, stdImport := range stdImports {
+		importSpecs = append(importSpecs, &ast.ImportSpec{
+			Path: &ast.BasicLit{
+				Kind:  token.STRING,
+				Value: quote(stdImport),
+			},
+		})
+	}
+
+	// Assign import
+	assignSpecs := []ast.Spec{}
+	for _, imp := range alien.ImportAssignments {
+		assignSpecs = append(assignSpecs, &imp)
+	}
+
+	// Functions
+	funcDecls := []ast.Decl{}
+	for _, highLevel := range alast.TopLevels {
+		if highLevel.Function != nil {
+			funcDecls = append(funcDecls, highLevel.Function.toGoAst(&alien))
+		}
+	}
+
+	// Externals
+	alien.PerformExternalAnalysis()
+	for external := range alien.Meta.Externals {
+		spec := MakeExternal(external)
+		assignSpecs = append(assignSpecs, &spec)
+	}
+
+	// Make decls
+
+	fileDecls := []ast.Decl{}
+
+	if len(importSpecs) > 0 {
+		importGenDecl := &ast.GenDecl{
+			Tok:   token.IMPORT,
+			Specs: importSpecs,
+		}
+
+		fileDecls = append(fileDecls, importGenDecl)
+	}
+
+	if len(assignSpecs) > 0 {
+		assignGenDecl := &ast.GenDecl{
+			Tok:   token.VAR,
+			Specs: assignSpecs,
+		}
+
+		fileDecls = append(fileDecls, assignGenDecl)
+	}
+
+	for _, decl := range funcDecls {
+		fileDecls = append(fileDecls, decl)
+	}
+
+	// Print the AlienGo struct
+	fs := token.NewFileSet()
+	fmt.Println(astNodeToString(fs, &ast.File{
+		Name:  ast.NewIdent("main"),
+		Decls: fileDecls,
+	}))
+
+}

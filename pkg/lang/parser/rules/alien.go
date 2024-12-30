@@ -4,22 +4,22 @@ import (
 	"go/ast"
 	"go/token"
 
-	types "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	types "github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
-type Alien struct {
+type Posh struct {
 	types.BaseNode
 	Content []types.Node `json:"content"`
 }
 
 var stdImports = []string{
-	"github.com/pouya-eghbali/alien-go/pkg/exec",
-	"github.com/pouya-eghbali/alien-go/pkg/io",
+	"github.com/pouya-eghbali/posh/pkg/exec",
+	"github.com/pouya-eghbali/posh/pkg/io",
 	"flag",
 }
 
-func (n *Alien) ToGoAst() ast.Node {
-	alien := types.NewAlienFile()
+func (n *Posh) ToGoAst() ast.Node {
+	posh := types.NewPoshFile()
 	decls := []ast.Decl{}
 	impSpecs := []ast.Spec{}
 
@@ -49,14 +49,14 @@ func (n *Alien) ToGoAst() ast.Node {
 
 	// collect top-level assignments
 	for _, node := range n.Content {
-		node.CollectTopLevelAssignments(alien)
+		node.CollectTopLevelAssignments(posh)
 	}
 
 	// add the value specs to the decls
-	if len(alien.TopLevelAssignments) > 0 {
+	if len(posh.TopLevelAssignments) > 0 {
 		decls = append(decls, &ast.GenDecl{
 			Tok:   token.VAR,
-			Specs: alien.TopLevelAssignments,
+			Specs: posh.TopLevelAssignments,
 		})
 	}
 
@@ -73,13 +73,13 @@ func (n *Alien) ToGoAst() ast.Node {
 	}
 }
 
-func MatchAlien(nodes []types.Node, offset int) types.Result {
+func MatchPosh(nodes []types.Node, offset int) types.Result {
 	// Loop match the top-level nodes until no more matches are found
 	start := offset
 
-	node := Alien{
+	node := Posh{
 		BaseNode: types.BaseNode{
-			Type: "ALIEN",
+			Type: "POSH",
 		},
 	}
 

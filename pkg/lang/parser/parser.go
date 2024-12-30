@@ -12,9 +12,9 @@ import (
 	"os/exec"
 	"path"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/lexer"
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/rules"
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/lexer"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/rules"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 func Parse(code string) (types.Node, *types.Node) {
@@ -25,7 +25,7 @@ func Parse(code string) (types.Node, *types.Node) {
 		return &types.BaseNode{}, nil
 	}
 
-	res := rules.MatchAlien(tokens, 0)
+	res := rules.MatchPosh(tokens, 0)
 
 	if res.FailedAt != nil {
 		return &types.BaseNode{}, res.FailedAt

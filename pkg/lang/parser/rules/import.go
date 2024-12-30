@@ -5,7 +5,7 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type ImportItem struct {
@@ -57,7 +57,7 @@ func (n *Import) ToGoAst() ast.Node {
 	}
 }
 
-func (n *Import) CollectTopLevelAssignments(alien *types.AlienFile) {
+func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
 	// for each import item as item, create an assignment
 	// e.g. from "fmt" import Println as fmtPrintln then
 	// fmtPrintln = fmt.Println
@@ -74,7 +74,7 @@ func (n *Import) CollectTopLevelAssignments(alien *types.AlienFile) {
 	}
 
 	if len(node.Names) > 0 {
-		alien.TopLevelAssignments = append(alien.TopLevelAssignments, &node)
+		posh.TopLevelAssignments = append(posh.TopLevelAssignments, &node)
 	}
 }
 

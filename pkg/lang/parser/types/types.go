@@ -13,7 +13,7 @@ type Node interface {
 	GetType() string
 	ToGoAst() ast.Node
 	ToGoStatementAst() ast.Stmt
-	CollectTopLevelAssignments(*AlienFile)
+	CollectTopLevelAssignments(*PoshFile)
 	Plug(*Environment)
 	UnPlug(*Environment)
 }

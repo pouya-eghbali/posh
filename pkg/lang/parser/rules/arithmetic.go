@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type ArithmeticNode struct {

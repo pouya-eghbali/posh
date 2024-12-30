@@ -3,7 +3,7 @@ package rules
 import (
 	"go/ast"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type SimpleExpression struct {

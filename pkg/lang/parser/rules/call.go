@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type Flag struct {
@@ -42,12 +42,12 @@ func (n *FunctionCall) ToGoAst() ast.Node {
 	}
 }
 
-func (n *FunctionCall) CollectTopLevelAssignments(alien *types.AlienFile) {
+func (n *FunctionCall) CollectTopLevelAssignments(posh *types.PoshFile) {
 	if n.Callable.GetType() == "IDENTIFIER" {
 		image := n.Callable.GetImage()
-		if _, ok := alien.Environment.Get(image); !ok {
+		if _, ok := posh.Environment.Get(image); !ok {
 			// We need to add {identifier} := exec.ExternalCommand("{identifier}")
-			alien.TopLevelAssignments = append(alien.TopLevelAssignments, &ast.ValueSpec{
+			posh.TopLevelAssignments = append(posh.TopLevelAssignments, &ast.ValueSpec{
 				Names: []*ast.Ident{{Name: image}},
 				Values: []ast.Expr{
 					&ast.CallExpr{
@@ -68,7 +68,7 @@ func (n *FunctionCall) CollectTopLevelAssignments(alien *types.AlienFile) {
 	}
 
 	for _, arg := range n.Args {
-		arg.CollectTopLevelAssignments(alien)
+		arg.CollectTopLevelAssignments(posh)
 	}
 }
 

@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type Pipe struct {
@@ -16,8 +16,8 @@ func (n *Pipe) ToGoAst() ast.Node {
 	return n.Value.ToGoAst()
 }
 
-func (n *Pipe) CollectTopLevelAssignments(alien *types.AlienFile) {
-	n.Value.CollectTopLevelAssignments(alien)
+func (n *Pipe) CollectTopLevelAssignments(posh *types.PoshFile) {
+	n.Value.CollectTopLevelAssignments(posh)
 }
 
 type RunContext struct {

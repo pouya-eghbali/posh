@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser"
 )
 
 var usage = `Usage: alc [options]

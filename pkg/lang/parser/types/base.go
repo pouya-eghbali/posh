@@ -34,6 +34,6 @@ func (n *BaseNode) ToGoStatementAst() ast.Stmt {
 	return nil
 }
 
-func (n *BaseNode) CollectTopLevelAssignments(f *AlienFile) {
+func (n *BaseNode) CollectTopLevelAssignments(f *PoshFile) {
 	// do nothing
 }

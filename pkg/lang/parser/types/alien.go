@@ -2,13 +2,13 @@ package types
 
 import "go/ast"
 
-type AlienFile struct {
+type PoshFile struct {
 	Environment         *Environment
 	TopLevelAssignments []ast.Spec
 }
 
-func NewAlienFile() *AlienFile {
-	return &AlienFile{
+func NewPoshFile() *PoshFile {
+	return &PoshFile{
 		Environment:         NewEnvironment(),
 		TopLevelAssignments: []ast.Spec{},
 	}

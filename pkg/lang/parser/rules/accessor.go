@@ -3,7 +3,7 @@ package rules
 import (
 	"go/ast"
 
-	types "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	types "github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type DotNotation struct {

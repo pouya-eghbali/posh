@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 type Param struct {
@@ -34,9 +34,9 @@ func (n *FunctionBody) ToGoAst() ast.Node {
 	}
 }
 
-func (n *FunctionBody) CollectTopLevelAssignments(alien *types.AlienFile) {
+func (n *FunctionBody) CollectTopLevelAssignments(posh *types.PoshFile) {
 	for _, content := range n.Content {
-		content.CollectTopLevelAssignments(alien)
+		content.CollectTopLevelAssignments(posh)
 	}
 }
 
@@ -186,8 +186,8 @@ func (n *Function) ToGoAst() ast.Node {
 	}
 }
 
-func (n *Function) CollectTopLevelAssignments(alien *types.AlienFile) {
-	n.Body.CollectTopLevelAssignments(alien)
+func (n *Function) CollectTopLevelAssignments(posh *types.PoshFile) {
+	n.Body.CollectTopLevelAssignments(posh)
 }
 
 func MatchFunctionParams(nodes []types.Node, offset int) types.Result {

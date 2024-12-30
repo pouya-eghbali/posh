@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 
-	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
 )
 
 // TODO: Needs plug and unplug
@@ -50,8 +50,8 @@ func (a *Assignment) ToGoStatementAst() ast.Stmt {
 	return a.ToGoAst().(*ast.AssignStmt)
 }
 
-func (a *Assignment) CollectTopLevelAssignments(alien *types.AlienFile) {
-	a.Value.CollectTopLevelAssignments(alien)
+func (a *Assignment) CollectTopLevelAssignments(posh *types.PoshFile) {
+	a.Value.CollectTopLevelAssignments(posh)
 }
 
 func MatchAssignment(nodes []types.Node, offset int) types.Result {

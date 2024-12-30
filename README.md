@@ -98,6 +98,20 @@ posh -i script.posh -o script
 > PoSH is currently under active development. The following examples are
 > conceptual and may not work as expected in the current version.
 
+### Flag Parsing
+
+```posh
+fn main(name string) {
+  io.Line(name)
+}
+```
+
+To pass the `name` parameter to the compiled binary, use the following command:
+
+```bash
+./compiled --name "Pouya"
+```
+
 ### File Manipulation
 
 ```posh

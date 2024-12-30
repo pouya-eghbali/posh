@@ -75,7 +75,7 @@ func WriteResultToTempDir(node types.Node) (string, error) {
 	fset := token.NewFileSet()
 	file := GoAstToString(fset, node.ToGoAst())
 
-	tempDir, err := os.MkdirTemp("", "alc-")
+	tempDir, err := os.MkdirTemp("", "posh-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp dir: %v", err)
 	}
@@ -93,28 +93,26 @@ func CompileTempDir(tempDir string, output string) error {
 	// Run go mod init
 	cmd := exec.Command("go", "mod", "init", "main")
 	cmd.Dir = tempDir
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to run go mod init: %v", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to run go mod init: %v, output: %s", err, string(output))
 	}
 
 	// Run go mod tidy
 	cmd = exec.Command("go", "mod", "tidy")
 	cmd.Dir = tempDir
-	err = cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to run go mod tidy: %v", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to run go mod tidy: %v, output: %s", err, string(output))
 	}
 
-	cmd = exec.Command("go", "build", "-ldflags", "\"-s -w\"", "-o", "main")
+	// Run go build
+	cmd = exec.Command("go", "build", "-ldflags", "-s -w", "-o", "main")
 	cmd.Dir = tempDir
-	err = cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to compile temp dir: %v", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to compile temp dir: %v, output: %s", err, string(output))
 	}
 
 	// Move the compiled binary to the output path
-	err = os.Rename(path.Join(tempDir, "main"), output)
+	err := os.Rename(path.Join(tempDir, "main"), output)
 	if err != nil {
 		return fmt.Errorf("failed to move compiled binary: %v", err)
 	}
@@ -144,8 +142,6 @@ func CompileFile(path string, output string, printAst bool) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(tempDir)
 
 	err = CompileTempDir(tempDir, output)
 	if err != nil {

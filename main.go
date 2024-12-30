@@ -8,7 +8,7 @@ import (
 	"github.com/pouya-eghbali/posh/pkg/lang/parser"
 )
 
-var usage = `Usage: alc [options]
+var usage = `Usage: posh [options]
 
 Options:
 	-i, -input string
@@ -21,7 +21,7 @@ Options:
 		Output the ast in JSON format
 
 Example:
-	alc -i file.alc
+	posh -i file.posh
 
 `
 

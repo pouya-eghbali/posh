@@ -1,6 +1,6 @@
-# PoSH
+# PoSh
 
-PoSH is a modern language designed to address the complexities and limitations
+PoSh is a modern language designed to address the complexities and limitations
 of traditional bash scripting for large automation tasks. By providing better
 error handling, flexibility, and portability, PoSH offers developers a powerful
 tool to write maintainable and robust scripts that can be compiled and shipped

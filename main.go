@@ -47,7 +47,7 @@ func main() {
 	flag.Parse()
 
 	if version {
-		fmt.Println("PoSH version 0.99.1")
+		fmt.Println("PoSh version 0.99.1")
 		os.Exit(0)
 	}
 

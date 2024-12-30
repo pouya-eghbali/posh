@@ -9,6 +9,8 @@ import (
 	"go/token"
 	"log"
 	"os"
+	"os/exec"
+	"path"
 
 	"github.com/pouya-eghbali/alien-go/pkg/lang/lexer"
 	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/rules"
@@ -67,4 +69,88 @@ func GoAstToString(fset *token.FileSet, node ast.Node) string {
 		log.Fatalf("failed to print AST node: %v", err)
 	}
 	return buf.String()
+}
+
+func WriteResultToTempDir(node types.Node) (string, error) {
+	fset := token.NewFileSet()
+	file := GoAstToString(fset, node.ToGoAst())
+
+	tempDir, err := os.MkdirTemp("", "alc-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %v", err)
+	}
+
+	tempFile := path.Join(tempDir, "main.go")
+	err = os.WriteFile(tempFile, []byte(file), 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to write temp file: %v", err)
+	}
+
+	return tempDir, nil
+}
+
+func CompileTempDir(tempDir string, output string) error {
+	// Run go mod init
+	cmd := exec.Command("go", "mod", "init", "main")
+	cmd.Dir = tempDir
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run go mod init: %v", err)
+	}
+
+	// Run go mod tidy
+	cmd = exec.Command("go", "mod", "tidy")
+	cmd.Dir = tempDir
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run go mod tidy: %v", err)
+	}
+
+	cmd = exec.Command("go", "build", "-ldflags", "\"-s -w\"", "-o", "main")
+	cmd.Dir = tempDir
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to compile temp dir: %v", err)
+	}
+
+	// Move the compiled binary to the output path
+	err = os.Rename(path.Join(tempDir, "main"), output)
+	if err != nil {
+		return fmt.Errorf("failed to move compiled binary: %v", err)
+	}
+
+	// Remove the temp dir
+	err = os.RemoveAll(tempDir)
+	if err != nil {
+		return fmt.Errorf("failed to remove temp dir: %v", err)
+	}
+
+	return nil
+}
+
+func CompileFile(path string, output string, printAst bool) error {
+	code, parsed, failedAt := ParseFile(path)
+
+	if failedAt != nil {
+		PrintError(code, failedAt)
+		return nil
+	}
+
+	if printAst {
+		PrintJSON(parsed)
+	}
+
+	tempDir, err := WriteResultToTempDir(parsed)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(tempDir)
+
+	err = CompileTempDir(tempDir, output)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

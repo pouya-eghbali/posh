@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"go/token"
 	"os"
 
 	"github.com/pouya-eghbali/alien-go/pkg/lang/parser"
@@ -44,23 +43,19 @@ func main() {
 
 	flag.Parse()
 
-	code, node, failedAt := parser.ParseFile(inputPath)
-	if failedAt != nil {
-		parser.PrintError(code, failedAt)
-		return
+	if inputPath == "" {
+		fmt.Println("No input file provided")
+		os.Exit(1)
 	}
 
-	if astOutput {
-		parser.PrintJSON(node)
+	if outputPath == "" {
+		fmt.Println("No output file provided")
+		os.Exit(1)
 	}
 
-	if outputPath != "" {
-		goAst := node.ToGoAst()
-		out := parser.GoAstToString(token.NewFileSet(), goAst)
-		err := os.WriteFile(outputPath, []byte(out), 0644)
-		if err != nil {
-			fmt.Println("Failed to write to the output file")
-		}
+	err := parser.CompileFile(inputPath, outputPath, astOutput)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-
 }

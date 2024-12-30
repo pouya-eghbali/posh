@@ -1,7 +1,11 @@
 from "fmt" import * as fmt
 
-fn main(name string) {
-  message = io.Format("Hello, %s!", name)
+fn main(name string, age int) {
+  message = io.Format(
+    "Hello, %s! You are %d years old!",
+    name,
+    age
+  )
   
   result =
     message

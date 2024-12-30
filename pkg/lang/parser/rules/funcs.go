@@ -124,7 +124,8 @@ func (n *Function) ToGoAst() ast.Node {
 			},
 		}}, body.List...)
 
-		for _, param := range n.Params.Params {
+		for i := len(n.Params.Params) - 1; i >= 0; i-- {
+			param := n.Params.Params[i]
 			body.List = append([]ast.Stmt{
 				&ast.DeclStmt{
 					Decl: &ast.GenDecl{

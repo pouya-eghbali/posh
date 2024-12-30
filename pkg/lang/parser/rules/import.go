@@ -1,6 +1,12 @@
 package rules
 
-import "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+import (
+	"go/ast"
+	"go/token"
+	"strings"
+
+	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+)
 
 type ImportItem struct {
 	types.BaseNode
@@ -13,6 +19,68 @@ type Import struct {
 	types.BaseNode
 	Module  types.Node    `json:"module"`
 	Imports []*ImportItem `json:"imports"`
+}
+
+func (n *Import) ToGoAst() ast.Node {
+	// create a list of imports
+	if len(n.Imports) == 1 && n.Imports[0].Name.GetImage() == "*" {
+		// import all
+		return &ast.GenDecl{
+			Tok: token.IMPORT,
+			Specs: []ast.Spec{
+				&ast.ImportSpec{
+					Name: n.Imports[0].Alias.ToGoAst().(*ast.Ident),
+					Path: &ast.BasicLit{
+						Kind:  token.STRING,
+						Value: n.Module.GetImage(),
+					},
+				},
+			},
+		}
+	}
+
+	specs := []ast.Spec{}
+	for _, imp := range n.Imports {
+		spec := &ast.ImportSpec{
+			Name: imp.Alias.ToGoAst().(*ast.Ident),
+			Path: &ast.BasicLit{
+				Kind:  token.STRING,
+				Value: n.Module.GetImage(),
+			},
+		}
+		specs = append(specs, spec)
+	}
+
+	return &ast.GenDecl{
+		Tok:   token.IMPORT,
+		Specs: specs,
+	}
+}
+
+func (n *Import) CollectTopLevelAssignments(alien *types.AlienFile) {
+	// for each import item as item, create an assignment
+	// e.g. from "fmt" import Println as fmtPrintln then
+	// fmtPrintln = fmt.Println
+	node := ast.ValueSpec{}
+
+	for _, imp := range n.Imports {
+		if imp.Name.GetImage() != "*" && imp.Alias == nil {
+			node.Names = append(node.Names, imp.Name.ToGoAst().(*ast.Ident))
+			node.Values = append(node.Values, &ast.SelectorExpr{
+				X:   &ast.Ident{Name: importPathToImportName(n.Module.GetImage())},
+				Sel: imp.Name.ToGoAst().(*ast.Ident),
+			})
+		}
+	}
+
+	if len(node.Names) > 0 {
+		alien.TopLevelAssignments = append(alien.TopLevelAssignments, &node)
+	}
+}
+
+func importPathToImportName(path string) string {
+	parts := strings.Split(path, "/")
+	return parts[len(parts)-1]
 }
 
 func MatchImportAllAsItem(nodes []types.Node, offset int) types.Result {

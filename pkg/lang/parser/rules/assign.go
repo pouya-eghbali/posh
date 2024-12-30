@@ -1,6 +1,11 @@
 package rules
 
-import "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+import (
+	"go/ast"
+	"go/token"
+
+	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+)
 
 // TODO: Needs plug and unplug
 type Assignment struct {
@@ -8,6 +13,45 @@ type Assignment struct {
 	Identifier types.Node `json:"identifier"`
 	Value      types.Node `json:"value"`
 	ValueType  string     `json:"valueType"`
+}
+
+func (a *Assignment) ToGoAst() ast.Node {
+	var value ast.Expr
+
+	if a.Value != nil && a.Value.GetType() == "PIPE" {
+		// we need to add .Wait().ToString() to the end of the pipe
+		value = &ast.CallExpr{
+			Fun: &ast.SelectorExpr{
+				X:   a.Value.ToGoAst().(ast.Expr),
+				Sel: &ast.Ident{Name: "Wait"},
+			},
+			Args: []ast.Expr{},
+		}
+
+		value = &ast.CallExpr{
+			Fun: &ast.SelectorExpr{
+				X:   value,
+				Sel: &ast.Ident{Name: "ToString"},
+			},
+			Args: []ast.Expr{},
+		}
+	} else if a.Value != nil {
+		value = a.Value.ToGoAst().(ast.Expr)
+	}
+
+	return &ast.AssignStmt{
+		Lhs: []ast.Expr{a.Identifier.ToGoAst().(ast.Expr)},
+		Tok: token.DEFINE,
+		Rhs: []ast.Expr{value},
+	}
+}
+
+func (a *Assignment) ToGoStatementAst() ast.Stmt {
+	return a.ToGoAst().(*ast.AssignStmt)
+}
+
+func (a *Assignment) CollectTopLevelAssignments(alien *types.AlienFile) {
+	a.Value.CollectTopLevelAssignments(alien)
 }
 
 func MatchAssignment(nodes []types.Node, offset int) types.Result {

@@ -1,12 +1,42 @@
 package rules
 
-import "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+import (
+	"go/ast"
+	"go/token"
+
+	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+)
 
 type ArithmeticNode struct {
 	types.BaseNode
 	Lhs types.Node `json:"lhs"`
 	Op  types.Node `json:"op"`
 	Rhs types.Node `json:"rhs"`
+}
+
+var tokenMap = map[string]token.Token{
+	"+": token.ADD,
+	"-": token.SUB,
+	"*": token.MUL,
+	"/": token.QUO,
+}
+
+func (a *ArithmeticNode) ToGoAst() ast.Node {
+	var lhs, rhs ast.Expr
+
+	if a.Lhs != nil {
+		lhs = a.Lhs.ToGoAst().(ast.Expr)
+	}
+
+	if a.Rhs != nil {
+		rhs = a.Rhs.ToGoAst().(ast.Expr)
+	}
+
+	return &ast.BinaryExpr{
+		X:  lhs,
+		Op: tokenMap[a.Op.GetImage()],
+		Y:  rhs,
+	}
 }
 
 func isOperator(value string) bool {

@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"go/ast"
+	"go/token"
+
 	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
 )
 
@@ -20,13 +23,170 @@ type FunctionBody struct {
 	Content []types.Node `json:"content"`
 }
 
+func (n *FunctionBody) ToGoAst() ast.Node {
+	body := []ast.Stmt{}
+	for _, content := range n.Content {
+		body = append(body, content.ToGoStatementAst())
+	}
+
+	return &ast.BlockStmt{
+		List: body,
+	}
+}
+
+func (n *FunctionBody) CollectTopLevelAssignments(alien *types.AlienFile) {
+	for _, content := range n.Content {
+		content.CollectTopLevelAssignments(alien)
+	}
+}
+
 // TODO: Needs plug and unplug
 type Function struct {
 	types.BaseNode
 	Identifier types.Node    `json:"identifier"`
-	ReturnType types.Node    `json:"returnType"`
+	ReturnType *types.Node   `json:"returnType"`
 	Params     *Parameters   `json:"params"`
 	Body       *FunctionBody `json:"body"`
+}
+
+func getFlagVarName(paramType string) string {
+	switch paramType {
+	case "string":
+		return "StringVar"
+	case "int":
+		return "IntVar"
+	case "bool":
+		return "BoolVar"
+	default:
+		return "StringVar"
+	}
+}
+
+func getFlagDefaultValue(paramType string) ast.Expr {
+	switch paramType {
+	case "string":
+		return &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: "\"\"",
+		}
+	case "int":
+		return &ast.BasicLit{
+			Kind:  token.INT,
+			Value: "0",
+		}
+	case "bool":
+		return &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: "false",
+		}
+	default:
+		return &ast.BasicLit{
+			Kind:  token.STRING,
+			Value: "\"\"",
+		}
+	}
+}
+
+func (n *Function) ToGoAst() ast.Node {
+	funcType := &ast.FuncType{}
+
+	if n.ReturnType != nil && (*n.ReturnType).GetImage() != "void" {
+		funcType.Results = &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Type: (*n.ReturnType).ToGoAst().(ast.Expr),
+				},
+			},
+		}
+	}
+
+	body := n.Body.ToGoAst().(*ast.BlockStmt)
+
+	if n.Identifier.GetImage() == "main" {
+		// main function params should be turned into command line arguments
+		// using flag package and added to the main function body:
+		// fn main(name string, age int) should be turned into:
+		// func main() {
+		//     var name string
+		//     flag.StringVar(&name, "name", "", "")
+		//     var age int
+		//     age := flag.IntVar(&age, "age", "", "")
+		//     flag.Parse()
+		// }
+		// parameter types should be used to determine the type of the flag
+
+		body.List = append([]ast.Stmt{&ast.ExprStmt{
+			X: &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   &ast.Ident{Name: "flag"},
+					Sel: &ast.Ident{Name: "Parse"},
+				},
+			},
+		}}, body.List...)
+
+		for _, param := range n.Params.Params {
+			body.List = append([]ast.Stmt{
+				&ast.DeclStmt{
+					Decl: &ast.GenDecl{
+						Tok: token.VAR,
+						Specs: []ast.Spec{
+							&ast.ValueSpec{
+								Names: []*ast.Ident{param.Identifier.ToGoAst().(*ast.Ident)},
+								Type:  param.ParamType.ToGoAst().(ast.Expr),
+							},
+						},
+					},
+				},
+				&ast.ExprStmt{
+					X: &ast.CallExpr{
+						Fun: &ast.SelectorExpr{
+							X:   &ast.Ident{Name: "flag"},
+							Sel: &ast.Ident{Name: getFlagVarName(param.ParamType.GetImage())},
+						},
+						Args: []ast.Expr{
+							&ast.UnaryExpr{
+								Op: token.AND,
+								X:  &ast.Ident{Name: param.Identifier.GetImage()},
+							},
+							&ast.BasicLit{
+								Kind:  token.STRING,
+								Value: "\"" + param.Identifier.GetImage() + "\"",
+							},
+							getFlagDefaultValue(param.ParamType.GetImage()),
+							&ast.BasicLit{
+								Kind:  token.STRING,
+								Value: "\"\"",
+							},
+						},
+					},
+				},
+			}, body.List...)
+		}
+
+	} else {
+		params := []*ast.Field{}
+
+		for _, param := range n.Params.Params {
+			params = append(params, &ast.Field{
+				Names: []*ast.Ident{param.Identifier.ToGoAst().(*ast.Ident)},
+				Type:  param.ParamType.ToGoAst().(ast.Expr),
+			})
+		}
+
+		funcType.Params = &ast.FieldList{
+			List: params,
+		}
+	}
+
+	return &ast.FuncDecl{
+		Name: n.Identifier.ToGoAst().(*ast.Ident),
+		Type: funcType,
+		Body: body,
+	}
+}
+
+func (n *Function) CollectTopLevelAssignments(alien *types.AlienFile) {
+	n.Body.CollectTopLevelAssignments(alien)
 }
 
 func MatchFunctionParams(nodes []types.Node, offset int) types.Result {
@@ -147,7 +307,7 @@ func MatchFunction(nodes []types.Node, offset int) types.Result {
 			return types.Result{FailedAt: &nodes[offset]}
 		}
 
-		node.ReturnType = nodes[offset]
+		node.ReturnType = &nodes[offset]
 		offset++
 	}
 

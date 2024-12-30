@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	tr     = exec.ExternalCommand("tr")
 	lolcat = exec.ExternalCommand("lolcat")
+	tr     = exec.ExternalCommand("tr")
 	echo   = exec.ExternalCommand("echo")
 )
 

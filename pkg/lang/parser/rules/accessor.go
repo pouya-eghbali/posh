@@ -1,12 +1,32 @@
 package rules
 
 import (
+	"go/ast"
+
 	types "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
 )
 
 type DotNotation struct {
 	types.BaseNode
 	Accessors []types.Node `json:"accessors"`
+}
+
+func (d *DotNotation) ToGoAst() ast.Node {
+	// Start with the first identifier
+	var expr ast.Expr
+	expr = ast.NewIdent(d.Accessors[0].GetImage())
+
+	// Chain the accesses
+	for _, access := range d.Accessors[1:] {
+		selector := &ast.SelectorExpr{
+			X:   expr,
+			Sel: ast.NewIdent(access.GetImage()),
+		}
+
+		expr = selector
+	}
+
+	return expr
 }
 
 func MatchDotNotation(nodes []types.Node, offset int) types.Result {
@@ -16,15 +36,16 @@ func MatchDotNotation(nodes []types.Node, offset int) types.Result {
 		return types.Result{FailedAt: &nodes[offset]}
 	}
 
-	// if there are no dots, this is not a dot notation
-	if offset+1 >= len(nodes) || nodes[offset+1].GetType() != "PUNCTUATOR" || nodes[offset+1].GetImage() != "." {
-		return types.Result{FailedAt: &nodes[offset+1]}
-	}
-
 	node := DotNotation{
 		BaseNode: types.BaseNode{
 			Type: "DOT_NOTATION",
 		},
+		Accessors: []types.Node{nodes[offset]},
+	}
+
+	// if there are no dots, this is not a dot notation
+	if offset+1 >= len(nodes) || nodes[offset+1].GetType() != "PUNCTUATOR" || nodes[offset+1].GetImage() != "." {
+		return types.Result{FailedAt: &nodes[offset+1]}
 	}
 
 	offset++

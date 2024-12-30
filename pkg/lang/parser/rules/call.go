@@ -1,6 +1,13 @@
 package rules
 
-import "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+import (
+	"fmt"
+	"go/ast"
+	"go/token"
+	"strings"
+
+	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+)
 
 type Flag struct {
 	types.BaseNode
@@ -8,10 +15,67 @@ type Flag struct {
 	DashCount  int        `json:"dashCount"`
 }
 
+func (n *Flag) ToGoAst() ast.Node {
+	// treat the flag as a string
+	flagStr := strings.Repeat("-", n.DashCount) + n.Identifier.GetImage()
+	return &ast.BasicLit{
+		Kind:  token.STRING,
+		Value: fmt.Sprintf(`"%s"`, flagStr),
+	}
+}
+
 type FunctionCall struct {
 	types.BaseNode
 	Callable types.Node   `json:"callable"`
 	Args     []types.Node `json:"args"`
+}
+
+func (n *FunctionCall) ToGoAst() ast.Node {
+	args := []ast.Expr{}
+	for _, arg := range n.Args {
+		args = append(args, arg.ToGoAst().(ast.Expr))
+	}
+
+	return &ast.CallExpr{
+		Fun:  n.Callable.ToGoAst().(ast.Expr),
+		Args: args,
+	}
+}
+
+func (n *FunctionCall) CollectTopLevelAssignments(alien *types.AlienFile) {
+	if n.Callable.GetType() == "IDENTIFIER" {
+		image := n.Callable.GetImage()
+		if _, ok := alien.Environment.Get(image); !ok {
+			// We need to add {identifier} := exec.ExternalCommand("{identifier}")
+			alien.TopLevelAssignments = append(alien.TopLevelAssignments, &ast.ValueSpec{
+				Names: []*ast.Ident{{Name: image}},
+				Values: []ast.Expr{
+					&ast.CallExpr{
+						Fun: &ast.SelectorExpr{
+							X:   &ast.Ident{Name: "exec"},
+							Sel: &ast.Ident{Name: "ExternalCommand"},
+						},
+						Args: []ast.Expr{
+							&ast.BasicLit{
+								Kind:  token.STRING,
+								Value: fmt.Sprintf(`"%s"`, image),
+							},
+						},
+					},
+				},
+			})
+		}
+	}
+
+	for _, arg := range n.Args {
+		arg.CollectTopLevelAssignments(alien)
+	}
+}
+
+func (n *FunctionCall) ToGoStatementAst() ast.Stmt {
+	return &ast.ExprStmt{
+		X: n.ToGoAst().(ast.Expr),
+	}
 }
 
 func MatchFlag(nodes []types.Node, offset int) types.Result {

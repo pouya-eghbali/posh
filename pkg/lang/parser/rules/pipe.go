@@ -1,14 +1,40 @@
 package rules
 
-import "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+import (
+	"go/ast"
+	"go/token"
+
+	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+)
 
 type Pipe struct {
 	types.BaseNode
-	Calls []*FunctionCall `json:"calls"`
+	Value FunctionCall `json:"value"`
+}
+
+func (n *Pipe) ToGoAst() ast.Node {
+	return n.Value.ToGoAst()
+}
+
+func (n *Pipe) CollectTopLevelAssignments(alien *types.AlienFile) {
+	n.Value.CollectTopLevelAssignments(alien)
 }
 
 type RunContext struct {
 	types.BaseNode
+}
+
+func (n *RunContext) ToGoAst() ast.Node {
+	// this is &exec.RunContext{}
+	return &ast.UnaryExpr{
+		Op: token.AND,
+		X: &ast.CompositeLit{
+			Type: &ast.SelectorExpr{
+				X:   &ast.Ident{Name: "exec"},
+				Sel: &ast.Ident{Name: "RunContext"},
+			},
+		},
+	}
 }
 
 func MatchPipe(nodes []types.Node, offset int) types.Result {
@@ -46,7 +72,11 @@ func MatchPipe(nodes []types.Node, offset int) types.Result {
 		offset++
 
 		if res := MatchFunctionCall(nodes, offset); res.End > res.Start {
-			node.Calls = append(node.Calls, res.Node.(*FunctionCall))
+			call := res.Node.(*FunctionCall)
+			// prepend the args to the call args
+			call.Args = append(args, call.Args...)
+			args = []types.Node{call}
+			node.Value = *call
 			offset = res.End
 		} else {
 			break

@@ -1,8 +1,13 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/printer"
+	"go/token"
+	"log"
 	"os"
 
 	"github.com/pouya-eghbali/alien-go/pkg/lang/lexer"
@@ -54,4 +59,12 @@ func PrintJSON(node types.Node) {
 
 func Print(node types.Node) {
 	fmt.Println(node)
+}
+
+func GoAstToString(fset *token.FileSet, node ast.Node) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, node); err != nil {
+		log.Fatalf("failed to print AST node: %v", err)
+	}
+	return buf.String()
 }

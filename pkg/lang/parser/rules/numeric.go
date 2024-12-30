@@ -1,10 +1,18 @@
 package rules
 
-import "github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+import (
+	"go/ast"
+
+	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
+)
 
 type Numeric struct {
 	types.BaseNode
 	Value types.Node `json:"value"`
+}
+
+func (n *Numeric) ToGoAst() ast.Node {
+	return n.Value.ToGoAst()
 }
 
 func MatchNumeric(nodes []types.Node, offset int) types.Result {

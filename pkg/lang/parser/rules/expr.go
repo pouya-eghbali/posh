@@ -1,12 +1,18 @@
 package rules
 
 import (
+	"go/ast"
+
 	"github.com/pouya-eghbali/alien-go/pkg/lang/parser/types"
 )
 
 type SimpleExpression struct {
 	types.BaseNode
 	Value types.Node `json:"value"`
+}
+
+func (n *SimpleExpression) ToGoAst() ast.Node {
+	return n.Value.ToGoAst()
 }
 
 func MatchExpr(nodes []types.Node, offset int) types.Result {

@@ -35,4 +35,4 @@ This Contributor License Agreement ("Agreement") documents the rights granted by
 
 ## 7. Contact Information
 
-- Any questions or concerns about this Agreement or its application can be addressed to: unchained@kenshi.io.
+- Any questions or concerns about this Agreement or its application can be addressed to: @pouya-eghbali.

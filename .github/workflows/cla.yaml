@@ -21,7 +21,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-signatures: "cla.json"
+          path-to-signatures: ".cla/signatures.json"
           path-to-document: "https://github.com/pouya-eghbali/posh/blob/master/CLA.md"
 
           branch: "master"

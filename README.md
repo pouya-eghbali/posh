@@ -130,3 +130,17 @@ fn main() {
     io.Line(response.Body | json.PrettyPrint())
 }
 ```
+
+## TODO
+
+- [x] Lexer, parser, and code generator
+- [ ] Proper scope management
+- [ ] Dead code elimination
+- [ ] Imports
+- [ ] Control statements (if/else/while/for...)
+- [ ] Pipe-friendly function declarations
+- [ ] Standard library (`io`, `exec`, `http`, `os`...)
+- [ ] Commands (Improved CLI args handling)
+- [ ] Source mapping for runtime errors
+- [ ] Unit tests
+- [ ] Interactive shell (REPL)

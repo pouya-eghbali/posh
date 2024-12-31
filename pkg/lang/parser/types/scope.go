@@ -33,7 +33,11 @@ func (e *Environment) Set(key, value string) {
 }
 
 func (e *Environment) Get(key string) (string, bool) {
-	// Get a value from the current scope
-	value, ok := e.Scopes[e.Cursor][key]
-	return value, ok
+	// Get a value from the current or any parent scope
+	for i := e.Cursor; i >= 0; i-- {
+		if val, ok := e.Scopes[i][key]; ok {
+			return val, true
+		}
+	}
+	return "", false
 }

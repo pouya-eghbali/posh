@@ -23,6 +23,11 @@ func (n *Posh) ToGoAst() ast.Node {
 	decls := []ast.Decl{}
 	impSpecs := []ast.Spec{}
 
+	// collect top-level assignments
+	for _, node := range n.Content {
+		node.CollectTopLevelAssignments(posh)
+	}
+
 	// find all imports first
 	for _, node := range n.Content {
 		if node.GetType() == "IMPORT" {
@@ -46,11 +51,6 @@ func (n *Posh) ToGoAst() ast.Node {
 		Tok:   token.IMPORT,
 		Specs: impSpecs,
 	})
-
-	// collect top-level assignments
-	for _, node := range n.Content {
-		node.CollectTopLevelAssignments(posh)
-	}
 
 	// add the value specs to the decls
 	if len(posh.TopLevelAssignments) > 0 {

@@ -13,5 +13,5 @@ fn main(name string, age int) {
       | tr("[:lower:]", "[:upper:]")
       | lolcat(-f)
 
-  io.Line(result)
+  fmt.Println(result)
 }

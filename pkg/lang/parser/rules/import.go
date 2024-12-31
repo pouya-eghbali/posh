@@ -70,6 +70,10 @@ func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
 				X:   &ast.Ident{Name: importPathToImportName(n.Module.GetImage())},
 				Sel: imp.Name.ToGoAst().(*ast.Ident),
 			})
+
+			posh.Environment.Set(imp.Name.GetImage(), "unknown")
+		} else if imp.Name.GetImage() == "*" {
+			posh.Environment.Set(importPathToImportName(n.Module.GetImage()), "unknown")
 		}
 	}
 

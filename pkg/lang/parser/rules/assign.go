@@ -51,6 +51,7 @@ func (a *Assignment) ToGoStatementAst() ast.Stmt {
 }
 
 func (a *Assignment) CollectTopLevelAssignments(posh *types.PoshFile) {
+	posh.Environment.Set(a.Identifier.GetImage(), "unknown")
 	a.Value.CollectTopLevelAssignments(posh)
 }
 

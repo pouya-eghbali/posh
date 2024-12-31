@@ -187,7 +187,14 @@ func (n *Function) ToGoAst() ast.Node {
 }
 
 func (n *Function) CollectTopLevelAssignments(posh *types.PoshFile) {
+	posh.Environment.PushScope()
+
+	for _, param := range n.Params.Params {
+		posh.Environment.Set(param.Identifier.GetImage(), param.ParamType.GetImage())
+	}
+
 	n.Body.CollectTopLevelAssignments(posh)
+	posh.Environment.PopScope()
 }
 
 func MatchFunctionParams(nodes []types.Node, offset int) types.Result {

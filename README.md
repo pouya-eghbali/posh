@@ -134,7 +134,7 @@ fn main() {
 ## TODO
 
 - [x] Lexer, parser, and code generator
-- [ ] Proper scope management
+- [x] Proper scope management
 - [ ] Dead code elimination
 - [ ] Imports
 - [ ] Control statements (if/else/while/for...)

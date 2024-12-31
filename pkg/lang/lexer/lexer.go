@@ -62,10 +62,18 @@ func Lex(code string) ([]types.Node, error) {
 							column++
 						}
 					}
+				} else {
+					for _, c := range match {
+						if c == '\n' {
+							line++
+							column = 0
+						} else {
+							column++
+						}
+					}
 				}
 
 				offset += len(match)
-				column += len(match)
 				break
 			} else if pattern.Name == "STRING" {
 				return nil, fmt.Errorf("invalid string at %d:%d", line, column)

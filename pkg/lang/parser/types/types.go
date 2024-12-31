@@ -12,8 +12,9 @@ type Node interface {
 	GetImage() string
 	GetType() string
 	ToGoAst() ast.Node
+	ToGoAstAndPoshFile(name string) (ast.Node, *PoshFile)
 	ToGoStatementAst() ast.Stmt
-	CollectTopLevelAssignments(*PoshFile)
+	StaticAnalysis(*PoshFile)
 	Plug(*Environment)
 	UnPlug(*Environment)
 }

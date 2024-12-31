@@ -50,9 +50,9 @@ func (a *Assignment) ToGoStatementAst() ast.Stmt {
 	return a.ToGoAst().(*ast.AssignStmt)
 }
 
-func (a *Assignment) CollectTopLevelAssignments(posh *types.PoshFile) {
+func (a *Assignment) StaticAnalysis(posh *types.PoshFile) {
 	posh.Environment.Set(a.Identifier.GetImage(), "unknown")
-	a.Value.CollectTopLevelAssignments(posh)
+	a.Value.StaticAnalysis(posh)
 }
 
 func MatchAssignment(nodes []types.Node, offset int) types.Result {

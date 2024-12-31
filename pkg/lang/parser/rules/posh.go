@@ -12,20 +12,20 @@ type Posh struct {
 	Content []types.Node `json:"content"`
 }
 
-var stdImports = []string{
-	"github.com/pouya-eghbali/posh/pkg/exec",
-	"github.com/pouya-eghbali/posh/pkg/io",
-	"flag",
+var StdImports = map[string]string{
+	"exec": "github.com/pouya-eghbali/posh/pkg/exec",
+	"io":   "github.com/pouya-eghbali/posh/pkg/io",
+	"flag": "flag",
 }
 
-func (n *Posh) ToGoAst() ast.Node {
+func (n *Posh) ToGoAstAndPoshFile(name string) (ast.Node, *types.PoshFile) {
 	posh := types.NewPoshFile()
 	decls := []ast.Decl{}
 	impSpecs := []ast.Spec{}
 
 	// collect top-level assignments
 	for _, node := range n.Content {
-		node.CollectTopLevelAssignments(posh)
+		node.StaticAnalysis(posh)
 	}
 
 	// find all imports first
@@ -36,12 +36,12 @@ func (n *Posh) ToGoAst() ast.Node {
 		}
 	}
 
-	// Add standard imports
-	for _, imp := range stdImports {
+	// Add standard imports from posh.StdImports
+	for imp := range posh.StdImports {
 		impSpecs = append(impSpecs, &ast.ImportSpec{
 			Path: &ast.BasicLit{
 				Kind:  token.STRING,
-				Value: "\"" + imp + "\"",
+				Value: "\"" + StdImports[imp] + "\"",
 			},
 		})
 	}
@@ -67,10 +67,12 @@ func (n *Posh) ToGoAst() ast.Node {
 		}
 	}
 
-	return &ast.File{
-		Name:  &ast.Ident{Name: "main"},
+	file := &ast.File{
+		Name:  &ast.Ident{Name: name},
 		Decls: decls,
 	}
+
+	return file, posh
 }
 
 func MatchPosh(nodes []types.Node, offset int) types.Result {

@@ -1,0 +1,12 @@
+from "/lib/fancy.posh" import Fancify
+
+fn main(name string, age int) {
+  message = io.Format(
+    "Hello, %s! You are %d years old!",
+    name,
+    age
+  )
+  
+  result = Fancify(message)
+  io.Println(result)
+}

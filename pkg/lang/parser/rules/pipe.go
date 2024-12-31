@@ -16,8 +16,9 @@ func (n *Pipe) ToGoAst() ast.Node {
 	return n.Value.ToGoAst()
 }
 
-func (n *Pipe) CollectTopLevelAssignments(posh *types.PoshFile) {
-	n.Value.CollectTopLevelAssignments(posh)
+func (n *Pipe) StaticAnalysis(posh *types.PoshFile) {
+	posh.StdImports["exec"] = true
+	n.Value.StaticAnalysis(posh)
 }
 
 type RunContext struct {

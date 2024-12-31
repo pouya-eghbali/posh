@@ -97,6 +97,7 @@ posh -i script.posh -o script
 > [!NOTE]
 > PoSH is currently under active development. The following examples are
 > conceptual and may not work as expected in the current version.
+> See [./examples](./examples) for working examples.
 
 ### Flag Parsing
 
@@ -135,8 +136,9 @@ fn main() {
 
 - [x] Lexer, parser, and code generator
 - [x] Proper scope management
+- [x] Imports
+- [ ] Proper type tracking
 - [ ] Dead code elimination
-- [ ] Imports
 - [ ] Control statements (if/else/while/for...)
 - [ ] Pipe-friendly function declarations
 - [ ] Standard library (`io`, `exec`, `http`, `os`...)

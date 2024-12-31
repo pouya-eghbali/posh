@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/utils"
 )
 
 type ImportItem struct {
 	types.BaseNode
-	Name  types.Node `json:"name"`
-	Alias types.Node `json:"alias"`
+	Name  types.Node  `json:"name"`
+	Alias *types.Node `json:"alias"`
 }
 
 // TODO: Needs plug and unplug
@@ -19,6 +20,16 @@ type Import struct {
 	types.BaseNode
 	Module  types.Node    `json:"module"`
 	Imports []*ImportItem `json:"imports"`
+}
+
+func importPath(imp *Import) string {
+	if isPoshLocalImport(imp.Module) {
+		localPath := utils.Unquote(imp.Module.GetImage())
+		localPath = localPath[:len(localPath)-5]
+		return "\"main" + localPath + "\""
+	}
+
+	return imp.Module.GetImage()
 }
 
 func (n *Import) ToGoAst() ast.Node {
@@ -29,10 +40,10 @@ func (n *Import) ToGoAst() ast.Node {
 			Tok: token.IMPORT,
 			Specs: []ast.Spec{
 				&ast.ImportSpec{
-					Name: n.Imports[0].Alias.ToGoAst().(*ast.Ident),
+					Name: (*n.Imports[0].Alias).ToGoAst().(*ast.Ident),
 					Path: &ast.BasicLit{
 						Kind:  token.STRING,
-						Value: n.Module.GetImage(),
+						Value: importPath(n),
 					},
 				},
 			},
@@ -41,11 +52,18 @@ func (n *Import) ToGoAst() ast.Node {
 
 	specs := []ast.Spec{}
 	for _, imp := range n.Imports {
+		importName := ImportPathToImportName(n.Module.GetImage())
+		if imp.Alias != nil {
+			importName = (*imp.Alias).GetImage()
+		}
+
 		spec := &ast.ImportSpec{
-			Name: imp.Alias.ToGoAst().(*ast.Ident),
+			Name: &ast.Ident{
+				Name: importName,
+			},
 			Path: &ast.BasicLit{
 				Kind:  token.STRING,
-				Value: n.Module.GetImage(),
+				Value: importPath(n),
 			},
 		}
 		specs = append(specs, spec)
@@ -57,7 +75,12 @@ func (n *Import) ToGoAst() ast.Node {
 	}
 }
 
-func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
+func isPoshLocalImport(node types.Node) bool {
+	unquoted := utils.Unquote(node.GetImage())
+	return strings.HasPrefix(unquoted, "/") && strings.HasSuffix(unquoted, ".posh")
+}
+
+func (n *Import) StaticAnalysis(posh *types.PoshFile) {
 	// for each import item as item, create an assignment
 	// e.g. from "fmt" import Println as fmtPrintln then
 	// fmtPrintln = fmt.Println
@@ -66,10 +89,10 @@ func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
 	for _, imp := range n.Imports {
 		if imp.Name.GetImage() != "*" {
 			var importName string
-			if imp.Alias.GetImage() != "" {
-				importName = imp.Alias.GetImage()
+			if imp.Alias != nil {
+				importName = (*imp.Alias).GetImage()
 			} else {
-				importName = importPathToImportName(n.Module.GetImage())
+				importName = ImportPathToImportName(n.Module.GetImage())
 			}
 
 			node.Names = append(node.Names, imp.Name.ToGoAst().(*ast.Ident))
@@ -80,7 +103,12 @@ func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
 
 			posh.Environment.Set(imp.Name.GetImage(), "unknown")
 		} else if imp.Name.GetImage() == "*" {
-			posh.Environment.Set(importPathToImportName(n.Module.GetImage()), "unknown")
+			posh.Environment.Set(ImportPathToImportName(n.Module.GetImage()), "unknown")
+		}
+
+		// if import path is local and ends with .posh, add it to local imports
+		if isPoshLocalImport(n.Module) {
+			posh.LocalImports = append(posh.LocalImports, n.Module.GetImage())
 		}
 	}
 
@@ -89,9 +117,18 @@ func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
 	}
 }
 
-func importPathToImportName(path string) string {
-	parts := strings.Split(path, "/")
-	return parts[len(parts)-1]
+func ImportPathToImportName(path string) string {
+	unquoted := utils.Unquote(path)
+
+	parts := strings.Split(unquoted, "/")
+	name := parts[len(parts)-1]
+
+	// remove extension
+	if strings.HasSuffix(name, ".posh") {
+		name = name[:len(name)-5]
+	}
+
+	return name
 }
 
 func MatchImportAllAsItem(nodes []types.Node, offset int) types.Result {
@@ -124,7 +161,7 @@ func MatchImportAllAsItem(nodes []types.Node, offset int) types.Result {
 		return types.Result{FailedAt: &nodes[offset]}
 	}
 
-	node.Alias = nodes[offset]
+	node.Alias = &nodes[offset]
 	offset++
 
 	return types.Result{Node: &node, Start: start, End: offset}
@@ -159,7 +196,7 @@ func MatchImportItem(nodes []types.Node, offset int) types.Result {
 			return types.Result{FailedAt: &nodes[offset]}
 		}
 
-		node.Alias = nodes[offset]
+		node.Alias = &nodes[offset]
 		offset++
 	}
 

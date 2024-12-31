@@ -1,0 +1,6 @@
+fn Fancify(input string) string {
+  return input
+    | echo()
+    | tr("[:lower:]", "[:upper:]")
+    | lolcat(-f)
+}

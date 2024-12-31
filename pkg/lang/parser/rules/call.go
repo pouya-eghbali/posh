@@ -42,7 +42,9 @@ func (n *FunctionCall) ToGoAst() ast.Node {
 	}
 }
 
-func (n *FunctionCall) CollectTopLevelAssignments(posh *types.PoshFile) {
+func (n *FunctionCall) StaticAnalysis(posh *types.PoshFile) {
+	n.Callable.StaticAnalysis(posh)
+
 	if n.Callable.GetType() == "IDENTIFIER" {
 		image := n.Callable.GetImage()
 		if _, ok := posh.Environment.Get(image); !ok {
@@ -68,7 +70,7 @@ func (n *FunctionCall) CollectTopLevelAssignments(posh *types.PoshFile) {
 	}
 
 	for _, arg := range n.Args {
-		arg.CollectTopLevelAssignments(posh)
+		arg.StaticAnalysis(posh)
 	}
 }
 

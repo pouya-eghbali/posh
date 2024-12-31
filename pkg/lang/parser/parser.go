@@ -15,6 +15,7 @@ import (
 	"github.com/pouya-eghbali/posh/pkg/lang/lexer"
 	"github.com/pouya-eghbali/posh/pkg/lang/parser/rules"
 	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/utils"
 )
 
 func Parse(code string) (types.Node, *types.Node) {
@@ -34,18 +35,17 @@ func Parse(code string) (types.Node, *types.Node) {
 	return res.Node, nil
 }
 
-func ParseFile(path string) (string, types.Node, *types.Node) {
+func ParseFile(path string) (error, string, types.Node, *types.Node) {
 	bytes, err := os.ReadFile(path)
 
 	if err != nil {
-		fmt.Println(err)
-		return "", &types.BaseNode{}, nil
+		return fmt.Errorf("failed to read file: %v", err), "", &types.BaseNode{}, nil
 	}
 
 	code := string(bytes)
 	parsed, failedAt := Parse(code)
 
-	return code, parsed, failedAt
+	return nil, code, parsed, failedAt
 }
 
 func PrintJSON(node types.Node) {
@@ -71,9 +71,9 @@ func GoAstToString(fset *token.FileSet, node ast.Node) string {
 	return buf.String()
 }
 
-func WriteResultToTempDir(node types.Node) (string, error) {
+func WriteResultToTempDir(node ast.Node) (string, error) {
 	fset := token.NewFileSet()
-	file := GoAstToString(fset, node.ToGoAst())
+	file := GoAstToString(fset, node)
 
 	tempDir, err := os.MkdirTemp("", "posh-")
 	if err != nil {
@@ -126,8 +126,12 @@ func CompileTempDir(tempDir string, output string) error {
 	return nil
 }
 
-func CompileFile(path string, output string, printAst bool) error {
-	code, parsed, failedAt := ParseFile(path)
+func CompileFile(filePath string, output string, printAst bool) error {
+	err, code, parsed, failedAt := ParseFile(filePath)
+
+	if err != nil {
+		return err
+	}
 
 	if failedAt != nil {
 		PrintError(code, failedAt)
@@ -138,9 +142,53 @@ func CompileFile(path string, output string, printAst bool) error {
 		PrintJSON(parsed)
 	}
 
-	tempDir, err := WriteResultToTempDir(parsed)
+	goNode, poshFile := parsed.ToGoAstAndPoshFile("main")
+	tempDir, err := WriteResultToTempDir(goNode)
 	if err != nil {
 		return err
+	}
+
+	compiled := map[string]bool{}
+	toCompile := append([]string{}, poshFile.LocalImports...)
+	mainDir := path.Dir(filePath)
+
+	for len(toCompile) > 0 {
+		imp := utils.Unquote(toCompile[0])
+		impName := rules.ImportPathToImportName(toCompile[0])
+		toCompile = toCompile[1:]
+
+		if compiled[imp] {
+			continue
+		}
+
+		impPath := path.Join(mainDir, imp)
+		err, code, parsed, failedAt := ParseFile(impPath)
+
+		if err != nil {
+			return err
+		}
+
+		if failedAt != nil {
+			PrintError(code, failedAt)
+			return nil
+		}
+
+		goNode, poshFile := parsed.ToGoAstAndPoshFile(impName)
+		outputDir := path.Join(tempDir, imp[:len(imp)-5])
+		outputPath := path.Join(outputDir, "main.go")
+
+		err = os.MkdirAll(outputDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create output dir: %v", err)
+		}
+
+		err = os.WriteFile(outputPath, []byte(GoAstToString(token.NewFileSet(), goNode)), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write output file: %v", err)
+		}
+
+		toCompile = append(toCompile, poshFile.LocalImports...)
+		compiled[imp] = true
 	}
 
 	err = CompileTempDir(tempDir, output)

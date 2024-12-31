@@ -30,10 +30,14 @@ func (n *BaseNode) ToGoAst() ast.Node {
 	return nil
 }
 
+func (n *BaseNode) ToGoAstAndPoshFile(name string) (ast.Node, *PoshFile) {
+	return nil, nil
+}
+
 func (n *BaseNode) ToGoStatementAst() ast.Stmt {
 	return nil
 }
 
-func (n *BaseNode) CollectTopLevelAssignments(f *PoshFile) {
+func (n *BaseNode) StaticAnalysis(f *PoshFile) {
 	// do nothing
 }

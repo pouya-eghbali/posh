@@ -29,6 +29,19 @@ func (d *DotNotation) ToGoAst() ast.Node {
 	return expr
 }
 
+func (d *DotNotation) StaticAnalysis(posh *types.PoshFile) {
+	// if the first accessor is an identifier and not in the environment
+	// AND is one of the built-in libraries, we need to add it to the environment
+	if d.Accessors[0].GetType() == "IDENTIFIER" {
+		image := d.Accessors[0].GetImage()
+		if _, ok := posh.Environment.Get(image); !ok {
+			if _, ok := StdImports[image]; ok {
+				posh.StdImports[image] = true
+			}
+		}
+	}
+}
+
 func MatchDotNotation(nodes []types.Node, offset int) types.Result {
 	start := offset
 

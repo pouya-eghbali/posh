@@ -18,6 +18,50 @@ type Parameters struct {
 	Params []Param `json:"params"`
 }
 
+type ReturnStatement struct {
+	types.BaseNode
+	Expression *types.Node `json:"expression"`
+}
+
+func (n *ReturnStatement) ToGoStatementAst() ast.Stmt {
+	r := &ast.ReturnStmt{
+		Results: []ast.Expr{},
+	}
+
+	if n.Expression != nil {
+		expr := (*n.Expression).ToGoAst().(ast.Expr)
+
+		// if expr is a PIPE, we need to add .Wait().ToString() to it
+		if (*n.Expression).GetType() == "PIPE" {
+			expr = &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   expr,
+					Sel: &ast.Ident{Name: "Wait"},
+				},
+				Args: []ast.Expr{},
+			}
+
+			expr = &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   expr,
+					Sel: &ast.Ident{Name: "ToString"},
+				},
+				Args: []ast.Expr{},
+			}
+		}
+
+		r.Results = append(r.Results, expr)
+	}
+
+	return r
+}
+
+func (n *ReturnStatement) StaticAnalysis(posh *types.PoshFile) {
+	if n.Expression != nil {
+		(*n.Expression).StaticAnalysis(posh)
+	}
+}
+
 type FunctionBody struct {
 	types.BaseNode
 	Content []types.Node `json:"content"`
@@ -34,9 +78,9 @@ func (n *FunctionBody) ToGoAst() ast.Node {
 	}
 }
 
-func (n *FunctionBody) CollectTopLevelAssignments(posh *types.PoshFile) {
+func (n *FunctionBody) StaticAnalysis(posh *types.PoshFile) {
 	for _, content := range n.Content {
-		content.CollectTopLevelAssignments(posh)
+		content.StaticAnalysis(posh)
 	}
 }
 
@@ -186,14 +230,19 @@ func (n *Function) ToGoAst() ast.Node {
 	}
 }
 
-func (n *Function) CollectTopLevelAssignments(posh *types.PoshFile) {
+func (n *Function) StaticAnalysis(posh *types.PoshFile) {
 	posh.Environment.PushScope()
 
 	for _, param := range n.Params.Params {
 		posh.Environment.Set(param.Identifier.GetImage(), param.ParamType.GetImage())
 	}
 
-	n.Body.CollectTopLevelAssignments(posh)
+	// if the function is main and has parameters, we need to add the flag package
+	if n.Identifier.GetImage() == "main" && len(n.Params.Params) > 0 {
+		posh.StdImports["flag"] = true
+	}
+
+	n.Body.StaticAnalysis(posh)
 	posh.Environment.PopScope()
 }
 
@@ -246,6 +295,29 @@ func MatchFunctionParams(nodes []types.Node, offset int) types.Result {
 	return types.Result{Node: &node, Start: start, End: offset + 1}
 }
 
+func MatchReturnStatement(nodes []types.Node, offset int) types.Result {
+	start := offset
+
+	if nodes[offset].GetType() != "KEYWORD" || nodes[offset].GetImage() != "return" {
+		return types.Result{FailedAt: &nodes[offset]}
+	}
+
+	offset++
+
+	node := ReturnStatement{
+		BaseNode: types.BaseNode{
+			Type: "RETURN_STATEMENT",
+		},
+	}
+
+	if res := MatchExpr(nodes, offset); res.End > res.Start {
+		node.Expression = &res.Node
+		offset = res.End
+	}
+
+	return types.Result{Node: &node, Start: start, End: offset}
+}
+
 func MatchFunctionBody(nodes []types.Node, offset int) types.Result {
 	start := offset
 
@@ -270,6 +342,9 @@ func MatchFunctionBody(nodes []types.Node, offset int) types.Result {
 			node.Content = append(node.Content, res.Node)
 			offset = res.End
 		} else if res := MatchFunctionCall(nodes, offset); res.End > res.Start {
+			node.Content = append(node.Content, res.Node)
+			offset = res.End
+		} else if res := MatchReturnStatement(nodes, offset); res.End > res.Start {
 			node.Content = append(node.Content, res.Node)
 			offset = res.End
 		} else {

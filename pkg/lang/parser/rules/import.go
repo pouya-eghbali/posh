@@ -64,10 +64,17 @@ func (n *Import) CollectTopLevelAssignments(posh *types.PoshFile) {
 	node := ast.ValueSpec{}
 
 	for _, imp := range n.Imports {
-		if imp.Name.GetImage() != "*" && imp.Alias == nil {
+		if imp.Name.GetImage() != "*" {
+			var importName string
+			if imp.Alias.GetImage() != "" {
+				importName = imp.Alias.GetImage()
+			} else {
+				importName = importPathToImportName(n.Module.GetImage())
+			}
+
 			node.Names = append(node.Names, imp.Name.ToGoAst().(*ast.Ident))
 			node.Values = append(node.Values, &ast.SelectorExpr{
-				X:   &ast.Ident{Name: importPathToImportName(n.Module.GetImage())},
+				X:   &ast.Ident{Name: importName},
 				Sel: imp.Name.ToGoAst().(*ast.Ident),
 			})
 

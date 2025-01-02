@@ -33,7 +33,7 @@ func (r *RunContext) ToString() string {
 
 	result := ""
 	for scanner.Scan() {
-		result += scanner.Text()
+		result += scanner.Text() + "\n"
 	}
 
 	return result

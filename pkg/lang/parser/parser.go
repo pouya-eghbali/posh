@@ -1,13 +1,10 @@
 package parser
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/ast"
-	"go/printer"
 	"go/token"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -63,17 +60,9 @@ func Print(node types.Node) {
 	fmt.Println(node)
 }
 
-func GoAstToString(fset *token.FileSet, node ast.Node) string {
-	var buf bytes.Buffer
-	if err := printer.Fprint(&buf, fset, node); err != nil {
-		log.Fatalf("failed to print AST node: %v", err)
-	}
-	return buf.String()
-}
-
 func WriteResultToTempDir(node ast.Node) (string, error) {
 	fset := token.NewFileSet()
-	file := GoAstToString(fset, node)
+	file := utils.GoAstToString(fset, node)
 
 	tempDir, err := os.MkdirTemp("", "posh-")
 	if err != nil {
@@ -182,7 +171,7 @@ func CompileFile(filePath string, output string, printAst bool) error {
 			return fmt.Errorf("failed to create output dir: %v", err)
 		}
 
-		err = os.WriteFile(outputPath, []byte(GoAstToString(token.NewFileSet(), goNode)), 0644)
+		err = os.WriteFile(outputPath, []byte(utils.GoAstToString(token.NewFileSet(), goNode)), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write output file: %v", err)
 		}

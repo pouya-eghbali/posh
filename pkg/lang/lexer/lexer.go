@@ -17,9 +17,9 @@ type Pattern struct {
 var patterns = []Pattern{
 	{Name: "WHITESPACE", Re: regexp.MustCompile(`^(\s+)`)},
 	{Name: "COMMENT", Re: regexp.MustCompile(`^(#.*\n)`)},
-	{Name: "KEYWORD", Re: regexp.MustCompile(`^(fn|if|else|return|true|false|import|from|as|while|for|in|break|continue)\s`)},
+	{Name: "KEYWORD", Re: regexp.MustCompile(`^(fn|if|else|elif|and|or|not|return|true|false|import|from|as|while|for|in|break|continue)\s`)},
 	{Name: "IDENTIFIER", Re: regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9-_]*)`)},
-	{Name: "PUNCTUATOR", Re: regexp.MustCompile(`^([{}()[\],.;+-/*%=|])`)},
+	{Name: "PUNCTUATOR", Re: regexp.MustCompile(`^([{}()[\]<>,.;+-/*%=|!])`)},
 	{Name: "INTEGER", Re: regexp.MustCompile(`^([0-9]+)`)},
 	{Name: "FLOAT", Re: regexp.MustCompile(`^([0-9]+\.[0-9]+)`)},
 	{Name: "STRING", Re: regexp.MustCompile(`^"(\\.|[^"]*)"`)},

@@ -137,10 +137,11 @@ fn main() {
 - [x] Lexer, parser, and code generator
 - [x] Proper scope management
 - [x] Imports
+- [x] Control statements (if/elif/else)
+- [ ] Add loops
+- [ ] Pipe-friendly functions
 - [ ] Proper type tracking
 - [ ] Dead code elimination
-- [ ] Control statements (if/else/while/for...)
-- [ ] Pipe-friendly function declarations
 - [ ] Standard library (`io`, `exec`, `http`, `os`...)
 - [ ] Commands (Improved CLI args handling)
 - [ ] Source mapping for runtime errors

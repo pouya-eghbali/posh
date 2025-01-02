@@ -335,6 +335,7 @@ func MatchFunctionBody(nodes []types.Node, offset int) types.Result {
 
 	for {
 		if nodes[offset].GetType() == "PUNCTUATOR" && nodes[offset].GetImage() == "}" {
+			offset++
 			break
 		}
 
@@ -347,12 +348,15 @@ func MatchFunctionBody(nodes []types.Node, offset int) types.Result {
 		} else if res := MatchReturnStatement(nodes, offset); res.End > res.Start {
 			node.Content = append(node.Content, res.Node)
 			offset = res.End
+		} else if res := MatchIfStatement(nodes, offset); res.End > res.Start {
+			node.Content = append(node.Content, res.Node)
+			offset = res.End
 		} else {
 			return types.Result{FailedAt: &nodes[offset]}
 		}
 	}
 
-	return types.Result{Node: &node, Start: start, End: offset + 1}
+	return types.Result{Node: &node, Start: start, End: offset}
 }
 
 func MatchFunction(nodes []types.Node, offset int) types.Result {

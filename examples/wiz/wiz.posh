@@ -3,7 +3,7 @@ from "/lib/fancy.posh" import Fancify
 fn main(name string, age int) {
   greet = io.Format("Greetins, %s!", name)
   
-  if age > 30 {
+  if age >= 30 {
     io.Print(
       Fancify(
         io.Format("%s\nYou are a wizard, %s!", greet, name)

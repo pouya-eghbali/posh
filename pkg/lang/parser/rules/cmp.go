@@ -80,18 +80,27 @@ func MatchComparison(nodes []types.Node, offset int) types.Result {
 		deltaOffset := 1
 		if image == "!" {
 			if nodes[offset+1].GetImage() != "=" {
-				break
+				return types.Result{FailedAt: &nodes[offset]}
 			}
 			deltaOffset = 2
 			image = "!="
 		} else if image == "=" {
 			if nodes[offset+1].GetImage() != "=" {
-				break
+				return types.Result{FailedAt: &nodes[offset]}
 			}
 			deltaOffset = 2
 			image = "=="
-		} else if !isCmpOperator(image) {
+		} else if isCmpOperator(image) {
+			// check for = (e.g. <=, >=)
+			if nodes[offset+1].GetImage() == "=" {
+				deltaOffset = 2
+				image += "="
+			}
+		} else if len(cmpList) > 0 {
+			// If we have already matched a comparison, we should stop here
 			break
+		} else {
+			return types.Result{FailedAt: &nodes[offset]}
 		}
 
 		cmp.Op = &types.TokenNode{

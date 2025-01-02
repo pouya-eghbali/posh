@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pouya-eghbali/posh/pkg/constants"
 	"github.com/pouya-eghbali/posh/pkg/lang/parser"
 )
 
@@ -47,7 +48,7 @@ func main() {
 	flag.Parse()
 
 	if version {
-		fmt.Println("PoSH version 0.99.2")
+		fmt.Printf("PoSH version %s\n", constants.Version)
 		os.Exit(0)
 	}
 

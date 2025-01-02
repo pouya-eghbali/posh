@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 
+	"github.com/pouya-eghbali/posh/pkg/constants"
 	"github.com/pouya-eghbali/posh/pkg/lang/lexer"
 	"github.com/pouya-eghbali/posh/pkg/lang/parser/rules"
 	"github.com/pouya-eghbali/posh/pkg/lang/parser/types"
@@ -84,6 +85,13 @@ func CompileTempDir(tempDir string, output string) error {
 	cmd.Dir = tempDir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to run go mod init: %v, output: %s", err, string(output))
+	}
+
+	// Run go get github.com/pouya-eghbali/posh@version
+	cmd = exec.Command("go", "get", fmt.Sprintf("github.com/pouya-eghbali/posh@v%s", constants.Version))
+	cmd.Dir = tempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to run go get: %v, output: %s", err, string(output))
 	}
 
 	// Run go mod tidy

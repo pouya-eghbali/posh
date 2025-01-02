@@ -1,7 +1,6 @@
 package exec
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"sync"
@@ -29,14 +28,11 @@ func (r *RunContext) Wait() *RunContext {
 }
 
 func (r *RunContext) ToString() string {
-	scanner := bufio.NewScanner(r.Stdout)
-
-	result := ""
-	for scanner.Scan() {
-		result += scanner.Text() + "\n"
+	data, err := io.ReadAll(r.Stdout)
+	if err != nil {
+		return ""
 	}
-
-	return result
+	return string(data)
 }
 
 func NewContext() *RunContext {

@@ -338,6 +338,16 @@ func MatchReturnStatement(nodes []types.Node, offset int) types.Result {
 	return types.Result{Node: &node, Start: start, End: offset}
 }
 
+func includes(arr []string, item string) bool {
+	for _, i := range arr {
+		if i == item {
+			return true
+		}
+	}
+
+	return false
+}
+
 func MatchFunctionBody(nodes []types.Node, offset int) types.Result {
 	start := offset
 
@@ -369,6 +379,9 @@ func MatchFunctionBody(nodes []types.Node, offset int) types.Result {
 			node.Content = append(node.Content, res.Node)
 			offset = res.End
 		} else if res := MatchIfStatement(nodes, offset); res.End > res.Start {
+			node.Content = append(node.Content, res.Node)
+			offset = res.End
+		} else if res := MatchForLoop(nodes, offset); res.End > res.Start {
 			node.Content = append(node.Content, res.Node)
 			offset = res.End
 		} else {

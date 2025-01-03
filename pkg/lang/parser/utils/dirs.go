@@ -26,6 +26,16 @@ func CompileTempDir(tempDir string, output string) error {
 		return fmt.Errorf("failed to run go mod init: %v, output: %s", err, string(output))
 	}
 
+	// If POSH_REQUIRE_PATH is set, run:
+	// go mod edit -replace github.com/pouya-eghbali/posh=POSH_REQUIRE_PATH
+	if requirePath := os.Getenv("POSH_REQUIRE_PATH"); requirePath != "" {
+		cmd = exec.Command("go", "mod", "edit", "-replace", fmt.Sprintf("github.com/pouya-eghbali/posh=%s", requirePath))
+		cmd.Dir = tempDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to run go mod edit: %v, output: %s", err, string(output))
+		}
+	}
+
 	// Run go get github.com/pouya-eghbali/posh@version
 	cmd = exec.Command("go", "get", fmt.Sprintf("github.com/pouya-eghbali/posh@v%s", constants.Version))
 	cmd.Dir = tempDir

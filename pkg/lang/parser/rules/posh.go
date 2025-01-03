@@ -16,6 +16,7 @@ type Posh struct {
 var StdImports = map[string]string{
 	"exec": "github.com/pouya-eghbali/posh/pkg/exec",
 	"io":   "github.com/pouya-eghbali/posh/pkg/io",
+	"std":  "github.com/pouya-eghbali/posh/pkg/std",
 	"flag": "flag",
 }
 
@@ -45,10 +46,12 @@ func (n *Posh) CompileToGo(posh *types.PoshFile) error {
 	}
 
 	// Add the import declaration
-	decls = append(decls, &ast.GenDecl{
-		Tok:   token.IMPORT,
-		Specs: impSpecs,
-	})
+	if len(impSpecs) > 0 {
+		decls = append(decls, &ast.GenDecl{
+			Tok:   token.IMPORT,
+			Specs: impSpecs,
+		})
+	}
 
 	// add the value specs to the decls
 	if len(posh.TopLevelAssignments) > 0 {

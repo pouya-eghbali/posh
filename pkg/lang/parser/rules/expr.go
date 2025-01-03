@@ -42,6 +42,7 @@ func MatchSimpleExpression(nodes []types.Node, offset int) types.Result {
 
 	// We are looking for one of the following:
 	// - ARITHMETIC
+	// - RANGE
 	// - COMPARISON
 	// - CALL
 	// - NUMERIC
@@ -50,6 +51,11 @@ func MatchSimpleExpression(nodes []types.Node, offset int) types.Result {
 
 	// try to match ARITHMETIC
 	if res := MatchArithmetic(nodes, offset); res.End > res.Start {
+		return res
+	}
+
+	// try to match RANGE
+	if res := MatchRange(nodes, offset); res.End > res.Start {
 		return res
 	}
 

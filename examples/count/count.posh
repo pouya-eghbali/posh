@@ -1,0 +1,5 @@
+fn main(start int, step int, end int) {
+  for number in start, step .. end {
+    io.Println(number)
+  }
+}

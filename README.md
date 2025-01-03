@@ -139,13 +139,16 @@ fn main() {
 - [x] Imports
 - [x] Control statements (if/elif/else)
 - [ ] Add loops
+- [ ] Add arrays, hashmaps
 - [ ] Pipe-friendly functions
+- [ ] Make a syntax diagram
 - [ ] Proper type tracking
 - [ ] Dead code elimination
 - [ ] Standard library (`io`, `exec`, `http`, `os`...)
 - [ ] Commands (Improved CLI args handling)
 - [ ] Source mapping for runtime errors
 - [ ] Proper error handling (internals)
+- [ ] Semantic checks
 - [ ] Fix all in-code TODOs
 - [ ] Unit tests
 - [ ] Interactive shell (REPL)

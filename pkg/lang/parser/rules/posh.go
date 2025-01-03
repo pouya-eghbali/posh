@@ -5,6 +5,7 @@ import (
 	"go/token"
 
 	types "github.com/pouya-eghbali/posh/pkg/lang/parser/types"
+	"github.com/pouya-eghbali/posh/pkg/lang/parser/utils"
 )
 
 type Posh struct {
@@ -18,15 +19,12 @@ var StdImports = map[string]string{
 	"flag": "flag",
 }
 
-func (n *Posh) ToGoAstAndPoshFile(name string) (ast.Node, *types.PoshFile) {
-	posh := types.NewPoshFile()
+func (n *Posh) CompileToGo(posh *types.PoshFile) error {
 	decls := []ast.Decl{}
 	impSpecs := []ast.Spec{}
 
-	// collect top-level assignments
-	for _, node := range n.Content {
-		node.StaticAnalysis(posh)
-	}
+	// perform self-analysis
+	n.StaticAnalysis(posh)
 
 	// find all imports first
 	for _, node := range n.Content {
@@ -68,11 +66,26 @@ func (n *Posh) ToGoAstAndPoshFile(name string) (ast.Node, *types.PoshFile) {
 	}
 
 	file := &ast.File{
-		Name:  &ast.Ident{Name: name},
+		Name:  &ast.Ident{Name: posh.Package},
 		Decls: decls,
 	}
 
-	return file, posh
+	return utils.WritePoshFile(file, posh)
+}
+
+func (n *Posh) StaticAnalysis(posh *types.PoshFile) {
+	// find all functions and add them to the environment
+	for _, node := range n.Content {
+		if node.GetType() == "FUNCTION" {
+			// TODO: Environment should be a map of string to types.Export
+			// TODO: Rename types.Export to something more meaningful
+			posh.Environment.Set(node.(*Function).Identifier.GetImage(), "unknown")
+		}
+	}
+
+	for _, node := range n.Content {
+		node.StaticAnalysis(posh)
+	}
 }
 
 func MatchPosh(nodes []types.Node, offset int) types.Result {

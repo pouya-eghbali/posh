@@ -237,6 +237,26 @@ func (n *Function) StaticAnalysis(posh *types.PoshFile) {
 		posh.Environment.Set(param.Identifier.GetImage(), param.ParamType.GetImage())
 	}
 
+	// if the function name starts with a capital letter, it's a public function
+	// and should be added to the export list
+	firstLetter := n.Identifier.GetImage()[0]
+	if firstLetter >= 'A' && firstLetter <= 'Z' {
+		expDef := types.Export{
+			Type:   (*n.ReturnType).GetImage(),
+			IsFunc: true,
+			Params: []types.Param{},
+		}
+
+		for _, param := range n.Params.Params {
+			expDef.Params = append(expDef.Params, types.Param{
+				Name: param.Identifier.GetImage(),
+				Type: param.ParamType.GetImage(),
+			})
+		}
+
+		posh.Exports[n.Identifier.GetImage()] = expDef
+	}
+
 	// if the function is main and has parameters, we need to add the flag package
 	if n.Identifier.GetImage() == "main" && len(n.Params.Params) > 0 {
 		posh.StdImports["flag"] = true

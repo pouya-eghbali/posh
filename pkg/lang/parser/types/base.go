@@ -30,8 +30,8 @@ func (n *BaseNode) ToGoAst() ast.Node {
 	return nil
 }
 
-func (n *BaseNode) ToGoAstAndPoshFile(name string) (ast.Node, *PoshFile) {
-	return nil, nil
+func (n *BaseNode) CompileToGo(posh *PoshFile) error {
+	return nil
 }
 
 func (n *BaseNode) ToGoStatementAst() ast.Stmt {

@@ -145,5 +145,7 @@ fn main() {
 - [ ] Standard library (`io`, `exec`, `http`, `os`...)
 - [ ] Commands (Improved CLI args handling)
 - [ ] Source mapping for runtime errors
+- [ ] Proper error handling (internals)
+- [ ] Fix all in-code TODOs
 - [ ] Unit tests
 - [ ] Interactive shell (REPL)

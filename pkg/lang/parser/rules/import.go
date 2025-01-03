@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"strings"
@@ -85,30 +86,62 @@ func (n *Import) StaticAnalysis(posh *types.PoshFile) {
 	// e.g. from "fmt" import Println as fmtPrintln then
 	// fmtPrintln = fmt.Println
 	node := ast.ValueSpec{}
+	packageName := ImportPathToImportName(n.Module.GetImage())
+	var modExports map[string]types.Export
+
+	if isPoshLocalImport(n.Module) {
+		// We need to compile the local import and get the export definitions
+		importPath := utils.Unquote(n.Module.GetImage())[1:]
+		modPosh := types.NewPoshFile(
+			strings.TrimPrefix(importPath, posh.BaseDir),
+			posh.BaseDir,
+			posh.OutputDir,
+			packageName,
+			posh.CompiledFiles,
+		)
+
+		err := utils.CompilePoshFile(modPosh, MatchPosh)
+		if err != nil {
+			// TODO: Handle error
+			panic(err)
+		}
+
+		// Add the compiled file to the list of compiled files
+		// TODO: Actually use the cache!
+		posh.CompiledFiles[n.Module.GetImage()] = types.CompiledFile{
+			FileName: n.Module.GetImage(),
+			Exports:  modPosh.Exports,
+		}
+
+		modExports = modPosh.Exports
+	}
 
 	for _, imp := range n.Imports {
 		if imp.Name.GetImage() != "*" {
-			var importName string
+			var importAs string
 			if imp.Alias != nil {
-				importName = (*imp.Alias).GetImage()
+				importAs = (*imp.Alias).GetImage()
 			} else {
-				importName = ImportPathToImportName(n.Module.GetImage())
+				importAs = packageName
 			}
 
 			node.Names = append(node.Names, imp.Name.ToGoAst().(*ast.Ident))
 			node.Values = append(node.Values, &ast.SelectorExpr{
-				X:   &ast.Ident{Name: importName},
+				X:   &ast.Ident{Name: importAs},
 				Sel: imp.Name.ToGoAst().(*ast.Ident),
 			})
 
-			posh.Environment.Set(imp.Name.GetImage(), "unknown")
-		} else if imp.Name.GetImage() == "*" {
-			posh.Environment.Set(ImportPathToImportName(n.Module.GetImage()), "unknown")
-		}
+			importedName := imp.Name.GetImage()
+			importedType, ok := modExports[importedName]
 
-		// if import path is local and ends with .posh, add it to local imports
-		if isPoshLocalImport(n.Module) {
-			posh.LocalImports = append(posh.LocalImports, n.Module.GetImage())
+			if !ok {
+				// TODO: Handle error properly
+				panic(fmt.Sprintf("Imported name %s not found in module %s", importedName, n.Module.GetImage()))
+			}
+
+			posh.Environment.Set(imp.Name.GetImage(), importedType.Type)
+		} else if imp.Name.GetImage() == "*" {
+			posh.Environment.Set(packageName, fmt.Sprintf("module:%s", n.Module.GetImage()))
 		}
 	}
 

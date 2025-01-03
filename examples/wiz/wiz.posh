@@ -1,19 +1,14 @@
 from "/lib/fancy.posh" import Fancify
 
-fn main(name string, age int) {
-  greet = io.Format("Greetings, %s!", name)
-  
+fn isWizard(age int) string {
   if age >= 30 {
-    io.Print(
-      Fancify(
-        io.Format("%s\nYou are a wizard, %s!", greet, name)
-      )
-    )
+    return "You are a wizard"
   } else {
-    io.Print(
-      Fancify(
-        io.Format("%s\nYou are NOT a wizard, %s!", greet, name)
-      )
-    )
+    return "You are NOT a wizard"
   }
+}
+
+fn main(name string, age int) {
+  message = io.Format("Greetings, %s!\n%s, %s!", name, isWizard(age))
+  io.Print(Fancify(message))
 }

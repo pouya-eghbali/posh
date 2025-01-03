@@ -62,7 +62,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := parser.CompileFile(inputPath, outputPath, astOutput)
+	err := parser.CompileMainFile(inputPath, outputPath, astOutput)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

@@ -58,11 +58,14 @@ func MatchLogical(nodes []types.Node, offset int) types.Result {
 	offset++
 
 	// match BOOLEAN
-	if res := MatchBoolean(nodes, offset); res.End <= res.Start {
-		return types.Result{FailedAt: &nodes[offset]}
-	} else {
+	if res := MatchBoolean(nodes, offset); res.End > res.Start {
 		offset = res.End
 		logical.Rhs = res.Node
+	} else if res := MatchLogical(nodes, offset); res.End > res.Start {
+		offset = res.End
+		logical.Rhs = res.Node
+	} else {
+		return types.Result{FailedAt: &nodes[offset]}
 	}
 
 	return types.Result{Node: &logical, Start: start, End: offset + 1}

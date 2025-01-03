@@ -12,12 +12,14 @@ type Node interface {
 	GetImage() string
 	GetType() string
 	ToGoAst() ast.Node
-	ToGoAstAndPoshFile(name string) (ast.Node, *PoshFile)
+	CompileToGo(posh *PoshFile) error
 	ToGoStatementAst() ast.Stmt
 	StaticAnalysis(*PoshFile)
 	Plug(*Environment)
 	UnPlug(*Environment)
 }
+
+type TopLevelMatcher = func(nodes []Node, offset int) Result
 
 type Result struct {
 	Node     Node

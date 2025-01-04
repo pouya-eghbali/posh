@@ -138,7 +138,7 @@ fn main() {
 - [x] Proper scope management
 - [x] Imports
 - [x] Control statements (if/elif/else)
-- [ ] Add loops
+- [x] Add loops
 - [ ] Add arrays, hashmaps
 - [ ] Pipe-friendly functions
 - [ ] Make a syntax diagram
